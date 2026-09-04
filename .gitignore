@@ -1,0 +1,15 @@
+# Godot generated files
+.godot/
+.import/
+
+# Mono / C#
+.mono/
+
+# Build output
+builds/
+
+# OS / editor clutter
+.DS_Store
+Thumbs.db
+*~
+*.swp
