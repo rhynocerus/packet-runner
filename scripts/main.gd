@@ -8,10 +8,8 @@ const PURPLE := Color(0.545, 0.361, 0.965, 1.0)
 const RED := Color(1.0, 0.259, 0.427, 1.0)
 const YELLOW := Color(1.0, 0.820, 0.400, 1.0)
 
-const RHINO_SPEED := 330.0
 const GRID_SIZE := 64
 
-var rhino_position := Vector2(640, 400)
 var elapsed := 0.0
 var grid_offset := 0.0
 
@@ -26,7 +24,6 @@ func _ready() -> void:
 	rng.randomize()
 
 	var viewport_size := get_viewport_rect().size
-	rhino_position = viewport_size * Vector2(0.5, 0.58)
 
 	for i in range(14):
 		packet_positions.append(
@@ -42,7 +39,6 @@ func _ready() -> void:
 		packet_colors.append(palette[i % palette.size()])
 
 	_create_interface()
-
 	queue_redraw()
 
 
@@ -55,7 +51,7 @@ func _create_interface() -> void:
 	add_child(title)
 
 	var subtitle := Label.new()
-	subtitle.text = "DEFEND THE NETWORK  //  PROTOTYPE 0.1"
+	subtitle.text = "DEFEND THE NETWORK  //  PROTOTYPE 0.2"
 	subtitle.position = Vector2(35, 62)
 	subtitle.add_theme_font_size_override("font_size", 14)
 	subtitle.add_theme_color_override(
@@ -76,44 +72,8 @@ func _process(delta: float) -> void:
 	elapsed += delta
 	grid_offset = fmod(elapsed * 24.0, float(GRID_SIZE))
 
-	_move_rhino(delta)
 	_move_packets(delta)
-
 	queue_redraw()
-
-
-func _move_rhino(delta: float) -> void:
-	var movement := Vector2.ZERO
-
-	if Input.is_physical_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):
-		movement.y -= 1.0
-
-	if Input.is_physical_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):
-		movement.y += 1.0
-
-	if Input.is_physical_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT):
-		movement.x -= 1.0
-
-	if Input.is_physical_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT):
-		movement.x += 1.0
-
-	if movement.length_squared() > 0.0:
-		movement = movement.normalized()
-		rhino_position += movement * RHINO_SPEED * delta
-
-	var viewport_size := get_viewport_rect().size
-
-	rhino_position.x = clampf(
-		rhino_position.x,
-		75.0,
-		viewport_size.x - 105.0
-	)
-
-	rhino_position.y = clampf(
-		rhino_position.y,
-		155.0,
-		viewport_size.y - 80.0
-	)
 
 
 func _move_packets(delta: float) -> void:
@@ -153,7 +113,6 @@ func _draw() -> void:
 	)
 
 	_draw_packets()
-	_draw_rhino(rhino_position)
 
 
 func _draw_grid(size: Vector2) -> void:
@@ -197,93 +156,3 @@ func _draw_packets() -> void:
 		)
 
 		draw_circle(pos, 4.5, color)
-
-
-func _draw_rhino(pos: Vector2) -> void:
-	var pulse := (sin(elapsed * 4.0) + 1.0) * 0.5
-
-	draw_circle(
-		pos,
-		54.0 + pulse * 4.0,
-		Color(CYAN.r, CYAN.g, CYAN.b, 0.055)
-	)
-
-	draw_circle(
-		pos,
-		44.0,
-		Color(CYAN.r, CYAN.g, CYAN.b, 0.09)
-	)
-
-	var body := PackedVector2Array([
-		pos + Vector2(-45, -25),
-		pos + Vector2(20, -31),
-		pos + Vector2(50, -10),
-		pos + Vector2(38, 24),
-		pos + Vector2(-35, 27),
-		pos + Vector2(-55, 7)
-	])
-
-	draw_colored_polygon(body, GREEN)
-
-	var head := pos + Vector2(45, -10)
-
-	draw_circle(
-		head,
-		27.0,
-		Color(0.135, 0.780, 0.550, 1.0)
-	)
-
-	var horn := PackedVector2Array([
-		head + Vector2(20, -15),
-		head + Vector2(66, -27),
-		head + Vector2(23, 2)
-	])
-
-	draw_colored_polygon(horn, YELLOW)
-
-	var ear := PackedVector2Array([
-		head + Vector2(-10, -20),
-		head + Vector2(-2, -43),
-		head + Vector2(7, -20)
-	])
-
-	draw_colored_polygon(ear, GREEN)
-
-	draw_line(
-		pos + Vector2(-32, 20),
-		pos + Vector2(-37, 48),
-		GREEN,
-		10.0
-	)
-
-	draw_line(
-		pos + Vector2(15, 20),
-		pos + Vector2(10, 48),
-		GREEN,
-		10.0
-	)
-
-	draw_line(
-		pos + Vector2(-48, -8),
-		pos + Vector2(-69, -23),
-		GREEN,
-		5.0
-	)
-
-	draw_circle(
-		head + Vector2(8, -7),
-		5.0,
-		BG
-	)
-
-	draw_circle(
-		head + Vector2(10, -9),
-		1.8,
-		Color.WHITE
-	)
-
-	draw_circle(
-		pos + Vector2(-5, -3),
-		5.0,
-		CYAN
-	)
