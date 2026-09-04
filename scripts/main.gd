@@ -1,21 +1,30 @@
 extends Node2D
 
+const PACKET_SCENE := preload("res://scenes/packet/network_packet.tscn")
+
 const BG := Color(0.027, 0.067, 0.122, 1.0)
 const PANEL := Color(0.063, 0.114, 0.196, 1.0)
 const CYAN := Color(0.0, 0.898, 1.0, 1.0)
 const GREEN := Color(0.192, 0.969, 0.643, 1.0)
-const PURPLE := Color(0.545, 0.361, 0.965, 1.0)
-const RED := Color(1.0, 0.259, 0.427, 1.0)
 const YELLOW := Color(1.0, 0.820, 0.400, 1.0)
+const RED := Color(1.0, 0.259, 0.427, 1.0)
 
 const GRID_SIZE := 64
+const SPAWN_INTERVAL := 0.95
+
+const MAX_ESCUDO := 100
+const DANO_MALWARE := 15
+const PUNTOS_SEGURO := 10
 
 var elapsed := 0.0
 var grid_offset := 0.0
+var spawn_elapsed := 0.0
 
-var packet_positions: Array[Vector2] = []
-var packet_speeds: Array[float] = []
-var packet_colors: Array[Color] = []
+var puntos: int = 0
+var escudo: int = MAX_ESCUDO
+
+var puntos_label: Label
+var escudo_label: Label
 
 var rng := RandomNumberGenerator.new()
 
@@ -23,23 +32,24 @@ var rng := RandomNumberGenerator.new()
 func _ready() -> void:
 	rng.randomize()
 
-	var viewport_size := get_viewport_rect().size
-
-	for i in range(14):
-		packet_positions.append(
-			Vector2(
-				rng.randf_range(0.0, viewport_size.x),
-				rng.randf_range(140.0, viewport_size.y - 20.0)
-			)
-		)
-
-		packet_speeds.append(rng.randf_range(40.0, 115.0))
-
-		var palette := [CYAN, GREEN, PURPLE, RED, YELLOW]
-		packet_colors.append(palette[i % palette.size()])
-
 	_create_interface()
-	queue_redraw()
+	_reset_game_state()
+
+	for i in range(5):
+		_spawn_packet(float(i) * 190.0)
+
+
+func _reset_game_state() -> void:
+	puntos = 0
+	escudo = MAX_ESCUDO
+	_update_hud()
+
+	print(
+		"Estado inicial -> Puntos: ",
+		puntos,
+		" | Escudo: ",
+		escudo
+	)
 
 
 func _create_interface() -> void:
@@ -51,7 +61,7 @@ func _create_interface() -> void:
 	add_child(title)
 
 	var subtitle := Label.new()
-	subtitle.text = "DEFEND THE NETWORK  //  PROTOTYPE 0.2"
+	subtitle.text = "DEFIENDE LA RED  //  PROTOTIPO 0.2"
 	subtitle.position = Vector2(35, 62)
 	subtitle.add_theme_font_size_override("font_size", 14)
 	subtitle.add_theme_color_override(
@@ -60,8 +70,31 @@ func _create_interface() -> void:
 	)
 	add_child(subtitle)
 
+	puntos_label = Label.new()
+	puntos_label.position = Vector2(835, 23)
+	puntos_label.custom_minimum_size = Vector2(190, 32)
+	puntos_label.add_theme_font_size_override("font_size", 20)
+	puntos_label.add_theme_color_override("font_color", GREEN)
+	add_child(puntos_label)
+
+	escudo_label = Label.new()
+	escudo_label.position = Vector2(1030, 23)
+	escudo_label.custom_minimum_size = Vector2(220, 32)
+	escudo_label.add_theme_font_size_override("font_size", 20)
+	add_child(escudo_label)
+
+	var legend := Label.new()
+	legend.text = "● SEGURO +10     ◆ MALWARE -15 ESCUDO"
+	legend.position = Vector2(835, 62)
+	legend.add_theme_font_size_override("font_size", 13)
+	legend.add_theme_color_override(
+		"font_color",
+		Color(0.78, 0.86, 0.92, 1.0)
+	)
+	add_child(legend)
+
 	var controls := Label.new()
-	controls.text = "MOVE  [ W A S D ]  or  [ ARROW KEYS ]"
+	controls.text = "INTERCEPTA LOS SEGUROS  //  EVITA EL MALWARE  //  WASD + FLECHAS"
 	controls.position = Vector2(32, 680)
 	controls.add_theme_font_size_override("font_size", 14)
 	controls.add_theme_color_override("font_color", GREEN)
@@ -70,26 +103,84 @@ func _create_interface() -> void:
 
 func _process(delta: float) -> void:
 	elapsed += delta
-	grid_offset = fmod(elapsed * 24.0, float(GRID_SIZE))
+	spawn_elapsed += delta
 
-	_move_packets(delta)
+	grid_offset = fmod(
+		elapsed * 24.0,
+		float(GRID_SIZE)
+	)
+
+	if spawn_elapsed >= SPAWN_INTERVAL:
+		spawn_elapsed -= SPAWN_INTERVAL
+		_spawn_packet()
+
 	queue_redraw()
 
 
-func _move_packets(delta: float) -> void:
+func _spawn_packet(extra_x: float = 0.0) -> void:
+	var packet := PACKET_SCENE.instantiate() as NetworkPacket
 	var viewport_size := get_viewport_rect().size
 
-	for i in range(packet_positions.size()):
-		packet_positions[i].x += packet_speeds[i] * delta
+	var type := NetworkPacket.PacketType.SAFE
 
-		if packet_positions[i].x > viewport_size.x + 30.0:
-			packet_positions[i].x = -30.0
-			packet_positions[i].y = rng.randf_range(
-				140.0,
-				viewport_size.y - 30.0
-			)
+	if rng.randf() < 0.28:
+		type = NetworkPacket.PacketType.MALWARE
+
+	var packet_speed := rng.randf_range(150.0, 260.0)
+
+	packet.position = Vector2(
+		viewport_size.x + 50.0 + extra_x,
+		rng.randf_range(150.0, viewport_size.y - 60.0)
+	)
+
+	packet.configure(type, packet_speed)
+	packet.collected.connect(_on_packet_collected)
+
+	add_child(packet)
 
 
+func _on_packet_collected(packet_type: int) -> void:
+	if packet_type == NetworkPacket.PacketType.SAFE:
+		puntos += PUNTOS_SEGURO
+
+		if OS.is_debug_build():
+			print("Paquete seguro -> Puntos: ", puntos)
+
+	else:
+		escudo = clampi(
+			escudo - DANO_MALWARE,
+			0,
+			MAX_ESCUDO
+		)
+
+		if OS.is_debug_build():
+			print("Malware -> Escudo: ", escudo)
+
+	_update_hud()
+
+
+func _update_hud() -> void:
+	puntos_label.text = "PUNTOS  %05d" % puntos
+	escudo_label.text = "ESCUDO  %d/%d" % [
+		escudo,
+		MAX_ESCUDO
+	]
+
+	if escudo > 60:
+		escudo_label.add_theme_color_override(
+			"font_color",
+			CYAN
+		)
+	elif escudo > 40:
+		escudo_label.add_theme_color_override(
+			"font_color",
+			YELLOW
+		)
+	else:
+		escudo_label.add_theme_color_override(
+			"font_color",
+			RED
+		)
 func _draw() -> void:
 	var size := get_viewport_rect().size
 
@@ -112,13 +203,20 @@ func _draw() -> void:
 		2.0
 	)
 
-	_draw_packets()
-
 
 func _draw_grid(size: Vector2) -> void:
-	var grid_color := Color(CYAN.r, CYAN.g, CYAN.b, 0.06)
+	var grid_color := Color(
+		CYAN.r,
+		CYAN.g,
+		CYAN.b,
+		0.06
+	)
 
-	for x in range(-GRID_SIZE, int(size.x) + GRID_SIZE, GRID_SIZE):
+	for x in range(
+		-GRID_SIZE,
+		int(size.x) + GRID_SIZE,
+		GRID_SIZE
+	):
 		var px := float(x) + grid_offset
 
 		draw_line(
@@ -128,31 +226,14 @@ func _draw_grid(size: Vector2) -> void:
 			1.0
 		)
 
-	for y in range(110, int(size.y) + GRID_SIZE, GRID_SIZE):
+	for y in range(
+		110,
+		int(size.y) + GRID_SIZE,
+		GRID_SIZE
+	):
 		draw_line(
 			Vector2(0, float(y)),
 			Vector2(size.x, float(y)),
 			grid_color,
 			1.0
 		)
-
-
-func _draw_packets() -> void:
-	for i in range(packet_positions.size()):
-		var pos := packet_positions[i]
-		var color := packet_colors[i]
-
-		draw_line(
-			pos - Vector2(30, 0),
-			pos,
-			Color(color.r, color.g, color.b, 0.18),
-			2.0
-		)
-
-		draw_circle(
-			pos,
-			11.0,
-			Color(color.r, color.g, color.b, 0.08)
-		)
-
-		draw_circle(pos, 4.5, color)

@@ -1,23 +1,53 @@
 # Packet Runner 🦏⚡
 
-A colorful cross-platform arcade game inspired by networking and cybersecurity.
+Juego arcade 2D inspirado en redes informáticas y ciberseguridad.
 
-## Current milestone
+Desarrollado con **Godot 4 y GDScript**, con el objetivo de crear un proyecto
+multiplataforma, abierto y útil como muestra de desarrollo de software.
 
-`0.1-dev`
+## Estado actual
+
+Prototipo `0.2-dev`.
+
+### Mecánicas
+
+- Rinoceronte controlable.
+- Movimiento con WASD y flechas.
+- Paquetes seguros.
+- Paquetes de malware.
+- Sistema de puntuación.
+- Sistema de escudo.
+- Generación procedural básica de paquetes.
+- Interfaz en español.
+
+## Controles
+
+- `W A S D`
+- Flechas de dirección
+
+## Objetivo
+
+Intercepta los paquetes seguros y evita el malware.
+
+🟢 Paquete seguro: `+10 puntos`
+
+🔴 Malware: `-15 de escudo`
+
+## Tecnología
 
 - Godot 4
 - GDScript
-- Linux / Windows / Web / mobile target
-- Animated neon environment
-- Keyboard-controlled rhino prototype
-- Procedural ambient packet movement
+- Git / GitHub
+- Arquitectura basada en escenas y componentes
 
-## Controls
+## Plataformas previstas
 
-- W / A / S / D
-- Arrow keys
+- Linux
+- Windows
+- Web
+- Android
+- iOS
 
-## Status
+## Estado
 
-Early development prototype.
+Proyecto en desarrollo.

@@ -1,0 +1,14 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource path="res://scripts/packet/network_packet.gd" type="Script" id="1_packet"]
+
+[sub_resource type="CircleShape2D" id="CircleShape_packet"]
+radius = 13.0
+
+[node name="NetworkPacket" type="Area2D"]
+collision_layer = 2
+collision_mask = 1
+script = ExtResource("1_packet")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("CircleShape_packet")
