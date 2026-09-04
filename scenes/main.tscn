@@ -1,6 +1,10 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource path="res://scripts/main.gd" type="Script" id="1_main"]
+[ext_resource path="res://scenes/player/rhino_player.tscn" type="PackedScene" id="2_rhino"]
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1_main")
+
+[node name="RhinoPlayer" parent="." instance=ExtResource("2_rhino")]
+position = Vector2(640, 400)
