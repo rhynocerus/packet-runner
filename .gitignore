@@ -6,7 +6,7 @@
 .mono/
 
 # Build output
-builds/
+build/
 
 # OS / editor clutter
 .DS_Store
