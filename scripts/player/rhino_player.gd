@@ -13,6 +13,32 @@ const RHINO_LIGHT := Color(0.40, 0.62, 0.64, 1.0)
 
 var elapsed := 0.0
 
+const TOUCH_DEADZONE := 20.0
+
+var touch_active := false
+var touch_index := -1
+var touch_target := Vector2.ZERO
+
+
+func _input(event: InputEvent) -> void:
+	if event is InputEventScreenTouch:
+		var touch_event := event as InputEventScreenTouch
+
+		if touch_event.pressed and touch_index == -1:
+			touch_active = true
+			touch_index = touch_event.index
+			touch_target = touch_event.position
+
+		elif not touch_event.pressed and touch_event.index == touch_index:
+			touch_active = false
+			touch_index = -1
+
+	elif event is InputEventScreenDrag:
+		var drag_event := event as InputEventScreenDrag
+
+		if drag_event.index == touch_index:
+			touch_target = drag_event.position
+
 
 func _process(delta: float) -> void:
 	elapsed += delta
@@ -34,6 +60,15 @@ func _move(delta: float) -> void:
 
 	if Input.is_physical_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT):
 		movement.x += 1.0
+
+	# En pantallas táctiles, el rinoceronte sigue el dedo.
+	if touch_active:
+		var touch_delta := touch_target - position
+
+		if touch_delta.length() > TOUCH_DEADZONE:
+			movement = touch_delta.normalized()
+		else:
+			movement = Vector2.ZERO
 
 	if movement.length_squared() > 0.0:
 		movement = movement.normalized()
@@ -77,173 +112,188 @@ func _ellipse_points(
 func _draw() -> void:
 	var pulse := (sin(elapsed * 4.0) + 1.0) * 0.5
 
-	# Halo tecnológico
+	# Halo sutil
 	draw_circle(
-		Vector2.ZERO,
-		67.0 + pulse * 3.0,
-		Color(CYAN.r, CYAN.g, CYAN.b, 0.045)
+		Vector2(-6, 0),
+		62.0 + pulse * 2.0,
+		Color(CYAN.r, CYAN.g, CYAN.b, 0.04)
 	)
 
-	# Cuerpo ancho y pesado
+	# Sombra al suelo
 	draw_colored_polygon(
 		_ellipse_points(
-			Vector2(-10, 0),
-			Vector2(57, 34)
+			Vector2(-10, 34),
+			Vector2(48, 10),
+			28
+		),
+		Color(0.03, 0.08, 0.12, 0.45)
+	)
+
+	# Cuerpo principal
+	draw_colored_polygon(
+		_ellipse_points(
+			Vector2(-14, 0),
+			Vector2(54, 34),
+			40
 		),
 		RHINO_BODY
 	)
 
-	# Lomo
-	draw_arc(
-		Vector2(-10, 1),
-		58.0,
-		3.55,
-		5.75,
-		24,
-		RHINO_LIGHT,
-		3.0
-	)
+	# Masa del hombro / lomo superior
+	var upper_body := PackedVector2Array([
+		Vector2(-52, -10),
+		Vector2(-26, -28),
+		Vector2(10, -31),
+		Vector2(36, -20),
+		Vector2(28, -3),
+		Vector2(-6, -7),
+		Vector2(-38, -4)
+	])
+	draw_colored_polygon(upper_body, RHINO_LIGHT)
 
-	# Cuatro patas robustas
-	_draw_leg(Vector2(-42, 21))
-	_draw_leg(Vector2(-18, 25))
-	_draw_leg(Vector2(16, 24))
-	_draw_leg(Vector2(35, 20))
+	# Vientre / sombreado inferior
+	var belly := PackedVector2Array([
+		Vector2(-48, 10),
+		Vector2(-22, 17),
+		Vector2(10, 18),
+		Vector2(31, 13),
+		Vector2(22, 27),
+		Vector2(-34, 28),
+		Vector2(-52, 18)
+	])
+	draw_colored_polygon(belly, Color(0.18, 0.33, 0.38, 1.0))
 
 	# Cuello
 	var neck := PackedVector2Array([
-		Vector2(22, -20),
-		Vector2(51, -17),
-		Vector2(56, 17),
-		Vector2(26, 23)
+		Vector2(18, -18),
+		Vector2(44, -16),
+		Vector2(49, 14),
+		Vector2(23, 19),
+		Vector2(10, 4)
 	])
 	draw_colored_polygon(neck, RHINO_BODY)
 
-	# Cabeza característica
+	# Cabeza más limpia y algo estilizada
 	var head := PackedVector2Array([
-		Vector2(34, -22),
-		Vector2(56, -25),
-		Vector2(73, -15),
-		Vector2(82, -3),
-		Vector2(78, 15),
-		Vector2(61, 25),
-		Vector2(38, 18),
-		Vector2(27, 4)
+		Vector2(32, -20),
+		Vector2(52, -24),
+		Vector2(72, -16),
+		Vector2(84, -2),
+		Vector2(81, 14),
+		Vector2(63, 24),
+		Vector2(40, 20),
+		Vector2(26, 6),
+		Vector2(24, -7)
 	])
 	draw_colored_polygon(head, RHINO_LIGHT)
 
-	# Hocico ancho
+	# Hocico
 	var snout := PackedVector2Array([
-		Vector2(65, -6),
-		Vector2(91, -2),
-		Vector2(94, 11),
-		Vector2(83, 20),
-		Vector2(61, 17)
+		Vector2(65, -4),
+		Vector2(89, -1),
+		Vector2(92, 10),
+		Vector2(82, 18),
+		Vector2(60, 16)
 	])
 	draw_colored_polygon(snout, RHINO_BODY)
 
+	# Placa frontal / base del cuerno
+	var forehead := PackedVector2Array([
+		Vector2(50, -19),
+		Vector2(66, -16),
+		Vector2(70, -6),
+		Vector2(54, -5)
+	])
+	draw_colored_polygon(forehead, RHINO_BODY)
+
 	# Cuerno principal
 	var horn_big := PackedVector2Array([
-		Vector2(70, -13),
-		Vector2(96, -43),
-		Vector2(82, -7)
+		Vector2(64, -13),
+		Vector2(92, -41),
+		Vector2(76, -6)
 	])
 	draw_colored_polygon(horn_big, YELLOW)
 
-	# Segundo cuerno
+	# Cuerno secundario
 	var horn_small := PackedVector2Array([
-		Vector2(55, -20),
-		Vector2(66, -36),
-		Vector2(64, -15)
+		Vector2(53, -18),
+		Vector2(65, -32),
+		Vector2(61, -13)
 	])
 	draw_colored_polygon(
 		horn_small,
-		Color(0.95, 0.72, 0.30, 1.0)
+		Color(0.93, 0.72, 0.32, 1.0)
 	)
 
 	# Orejas
 	var ear_back := PackedVector2Array([
-		Vector2(34, -20),
-		Vector2(28, -41),
-		Vector2(43, -25)
+		Vector2(33, -20),
+		Vector2(28, -36),
+		Vector2(41, -24)
 	])
-	draw_colored_polygon(ear_back, RHINO_BODY)
+	draw_colored_polygon(ear_back, RHINO_DARK)
 
 	var ear_front := PackedVector2Array([
-		Vector2(47, -23),
-		Vector2(48, -43),
-		Vector2(58, -25)
+		Vector2(45, -22),
+		Vector2(48, -38),
+		Vector2(57, -23)
 	])
-	draw_colored_polygon(ear_front, RHINO_LIGHT)
+	draw_colored_polygon(ear_front, RHINO_BODY)
 
 	# Ojo
-	draw_circle(
-		Vector2(61, -8),
-		4.5,
-		RHINO_DARK
-	)
+	draw_circle(Vector2(61, -7), 4.0, RHINO_DARK)
+	draw_circle(Vector2(62.3, -8.3), 1.3, Color.WHITE)
 
-	draw_circle(
-		Vector2(62.5, -9.5),
-		1.5,
-		Color.WHITE
-	)
+	# Narinas
+	draw_circle(Vector2(84, 7), 2.2, RHINO_DARK)
+	draw_circle(Vector2(78, 10), 1.7, RHINO_DARK)
 
-	# Nariz
-	draw_circle(
-		Vector2(85, 8),
-		2.7,
-		RHINO_DARK
-	)
-
-	# Cola corta
+	# Boca sutil
 	draw_line(
-		Vector2(-62, -2),
-		Vector2(-76, 7),
-		RHINO_BODY,
-		5.0
+		Vector2(73, 16),
+		Vector2(84, 15),
+		RHINO_DARK,
+		2.0
 	)
 
+	# Cola corta discreta
 	draw_line(
-		Vector2(-76, 7),
-		Vector2(-80, 14),
+		Vector2(-63, 0),
+		Vector2(-74, 8),
 		RHINO_DARK,
 		4.0
 	)
-
-	# Detalles tecnológicos
 	draw_line(
-		Vector2(-34, -8),
-		Vector2(5, -8),
-		CYAN,
-		2.0
+		Vector2(-74, 8),
+		Vector2(-78, 14),
+		RHINO_DARK,
+		3.0
 	)
 
-	draw_circle(
-		Vector2(-14, -8),
-		4.5,
-		CYAN
-	)
-
-	draw_line(
-		Vector2(-4, -8),
-		Vector2(15, 5),
-		GREEN,
-		2.0
-	)
+	# Patas
+	_draw_leg(Vector2(-42, 18), 26.0)
+	_draw_leg(Vector2(-16, 22), 24.0)
+	_draw_leg(Vector2(14, 22), 24.0)
+	_draw_leg(Vector2(34, 18), 26.0)
 
 
-func _draw_leg(base: Vector2) -> void:
+func _draw_leg(base: Vector2, height: float = 24.0) -> void:
+	# Parte principal de la pata
 	draw_line(
 		base,
-		base + Vector2(-2, 27),
+		base + Vector2(0, height),
 		RHINO_BODY,
-		13.0
+		11.0
 	)
 
+	# Pie / pezuña
+	_draw_foot(base + Vector2(0, height))
+
+
+func _draw_foot(center: Vector2) -> void:
 	draw_line(
-		base + Vector2(-7, 28),
-		base + Vector2(7, 28),
+		center + Vector2(-6, 1),
+		center + Vector2(6, 1),
 		RHINO_DARK,
-		6.0
+		5.0
 	)

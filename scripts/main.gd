@@ -94,7 +94,7 @@ func _create_interface() -> void:
 	add_child(legend)
 
 	var controls := Label.new()
-	controls.text = "INTERCEPTA LOS SEGUROS  //  EVITA EL MALWARE  //  WASD + FLECHAS"
+	controls.text = "PC: WASD + FLECHAS  //  MÓVIL: TOCA Y ARRASTRA"
 	controls.position = Vector2(32, 680)
 	controls.add_theme_font_size_override("font_size", 14)
 	controls.add_theme_color_override("font_color", GREEN)
