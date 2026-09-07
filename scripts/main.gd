@@ -23,14 +23,19 @@ var spawn_elapsed := 0.0
 var puntos: int = 0
 var escudo: int = MAX_ESCUDO
 var game_over: bool = false
+var game_started: bool = false
 
 var puntos_label: Label
 var escudo_label: Label
+var pause_button: Button
+var start_layer: CanvasLayer
+var pause_layer: CanvasLayer
 
 var rng := RandomNumberGenerator.new()
 
 
 func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	rng.randomize()
 
 	_create_interface()
@@ -38,6 +43,8 @@ func _ready() -> void:
 
 	for i in range(5):
 		_spawn_packet(float(i) * 190.0)
+
+	_show_start_screen()
 
 
 func _reset_game_state() -> void:
@@ -103,9 +110,164 @@ func _create_interface() -> void:
 	controls.add_theme_color_override("font_color", GREEN)
 	add_child(controls)
 
+	pause_button = Button.new()
+	pause_button.text = "PAUSA"
+	pause_button.position = Vector2(1145, 655)
+	pause_button.custom_minimum_size = Vector2(105, 48)
+	pause_button.add_theme_font_size_override("font_size", 16)
+	pause_button.visible = false
+	pause_button.pressed.connect(_pause_game)
+	add_child(pause_button)
+
+
+func _input(event: InputEvent) -> void:
+	if not game_started or game_over:
+		return
+
+	if event is InputEventKey:
+		var key_event := event as InputEventKey
+
+		if key_event.pressed and not key_event.echo:
+			if key_event.keycode == KEY_ESCAPE or key_event.keycode == KEY_P:
+				if get_tree().paused:
+					_resume_game()
+				else:
+					_pause_game()
+
+
+func _show_start_screen() -> void:
+	game_started = false
+	pause_button.visible = false
+
+	start_layer = CanvasLayer.new()
+	start_layer.name = "StartLayer"
+	start_layer.layer = 30
+	start_layer.process_mode = Node.PROCESS_MODE_WHEN_PAUSED
+	add_child(start_layer)
+
+	var shade := ColorRect.new()
+	shade.color = Color(0.01, 0.03, 0.05, 0.88)
+	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	start_layer.add_child(shade)
+
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	start_layer.add_child(center)
+
+	var box := VBoxContainer.new()
+	box.custom_minimum_size = Vector2(560, 330)
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.add_theme_constant_override("separation", 18)
+	center.add_child(box)
+
+	var title := Label.new()
+	title.text = "PACKET RUNNER"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 50)
+	title.add_theme_color_override("font_color", CYAN)
+	box.add_child(title)
+
+	var subtitle := Label.new()
+	subtitle.text = "DEFIENDE LA RED"
+	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	subtitle.add_theme_font_size_override("font_size", 22)
+	subtitle.add_theme_color_override("font_color", GREEN)
+	box.add_child(subtitle)
+
+	var instructions := Label.new()
+	instructions.text = "ATRAPA PAQUETES SEGUROS // EVITA EL MALWARE"
+	instructions.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	instructions.add_theme_font_size_override("font_size", 16)
+	box.add_child(instructions)
+
+	var play_button := Button.new()
+	play_button.text = "JUGAR"
+	play_button.custom_minimum_size = Vector2(260, 64)
+	play_button.add_theme_font_size_override("font_size", 22)
+	play_button.pressed.connect(_start_game)
+	box.add_child(play_button)
+
+	get_tree().paused = true
+
+
+func _start_game() -> void:
+	if is_instance_valid(start_layer):
+		start_layer.queue_free()
+
+	start_layer = null
+	game_started = true
+	pause_button.visible = true
+	get_tree().paused = false
+
+	var music := get_node_or_null("BackgroundMusic") as AudioStreamPlayer
+	if music and not music.playing:
+		music.play()
+
+
+func _pause_game() -> void:
+	if not game_started or game_over or get_tree().paused:
+		return
+
+	pause_layer = CanvasLayer.new()
+	pause_layer.name = "PauseLayer"
+	pause_layer.layer = 40
+	pause_layer.process_mode = Node.PROCESS_MODE_WHEN_PAUSED
+	add_child(pause_layer)
+
+	var shade := ColorRect.new()
+	shade.color = Color(0.01, 0.02, 0.04, 0.82)
+	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	pause_layer.add_child(shade)
+
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	pause_layer.add_child(center)
+
+	var box := VBoxContainer.new()
+	box.custom_minimum_size = Vector2(400, 260)
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.add_theme_constant_override("separation", 18)
+	center.add_child(box)
+
+	var title := Label.new()
+	title.text = "PAUSA"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 44)
+	title.add_theme_color_override("font_color", CYAN)
+	box.add_child(title)
+
+	var resume := Button.new()
+	resume.text = "CONTINUAR"
+	resume.custom_minimum_size = Vector2(250, 58)
+	resume.add_theme_font_size_override("font_size", 20)
+	resume.pressed.connect(_resume_game)
+	box.add_child(resume)
+
+	var restart := Button.new()
+	restart.text = "REINICIAR"
+	restart.custom_minimum_size = Vector2(250, 58)
+	restart.add_theme_font_size_override("font_size", 20)
+	restart.pressed.connect(_restart_from_pause)
+	box.add_child(restart)
+
+	get_tree().paused = true
+
+
+func _resume_game() -> void:
+	if is_instance_valid(pause_layer):
+		pause_layer.queue_free()
+
+	pause_layer = null
+	get_tree().paused = false
+
+
+func _restart_from_pause() -> void:
+	get_tree().paused = false
+	get_tree().reload_current_scene()
+
 
 func _process(delta: float) -> void:
-	if game_over:
+	if game_over or get_tree().paused or not game_started:
 		return
 
 	elapsed += delta

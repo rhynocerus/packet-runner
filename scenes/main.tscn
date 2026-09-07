@@ -16,7 +16,7 @@ position = Vector2(640, 400)
 [node name="BackgroundMusic" type="AudioStreamPlayer" parent="."]
 stream = ExtResource("3_music")
 volume_db = -3.0
-autoplay = true
+autoplay = false
 
 [node name="SfxSafe" type="AudioStreamPlayer" parent="."]
 stream = ExtResource("4_safe")
