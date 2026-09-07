@@ -149,10 +149,18 @@ func _on_packet_collected(packet_type: int) -> void:
 	if packet_type == NetworkPacket.PacketType.SAFE:
 		puntos += PUNTOS_SEGURO
 
+		var safe_sfx := get_node_or_null("SfxSafe") as AudioStreamPlayer
+		if safe_sfx:
+			safe_sfx.play()
+
 		if OS.is_debug_build():
 			print("Paquete seguro -> Puntos: ", puntos)
 
 	else:
+		var malware_sfx := get_node_or_null("SfxMalware") as AudioStreamPlayer
+		if malware_sfx:
+			malware_sfx.play()
+
 		escudo = clampi(
 			escudo - DANO_MALWARE,
 			0,
@@ -193,6 +201,10 @@ func _update_hud() -> void:
 
 func _show_game_over() -> void:
 	game_over = true
+
+	var game_over_sfx := get_node_or_null("SfxGameOver") as AudioStreamPlayer
+	if game_over_sfx:
+		game_over_sfx.play()
 
 	var music := get_node_or_null("BackgroundMusic") as AudioStreamPlayer
 	if music:
@@ -264,6 +276,7 @@ func _draw() -> void:
 		BG
 	)
 
+	_draw_savanna_background(size)
 	_draw_grid(size)
 
 	draw_rect(
@@ -277,6 +290,174 @@ func _draw() -> void:
 		Color(CYAN.r, CYAN.g, CYAN.b, 0.45),
 		2.0
 	)
+
+
+func _draw_savanna_background(size: Vector2) -> void:
+	var top := 110.0
+	var horizon := size.y * 0.63
+
+	# Cielo en bandas suaves.
+	var sky_colors := [
+		Color(0.035, 0.10, 0.16, 1.0),
+		Color(0.055, 0.16, 0.22, 1.0),
+		Color(0.12, 0.25, 0.28, 1.0),
+		Color(0.25, 0.34, 0.27, 1.0)
+	]
+
+	var band_height := (horizon - top) / float(sky_colors.size())
+
+	for i in range(sky_colors.size()):
+		draw_rect(
+			Rect2(
+				0,
+				top + band_height * i,
+				size.x,
+				band_height + 1.0
+			),
+			sky_colors[i]
+		)
+
+	# Sol lejano.
+	draw_circle(
+		Vector2(size.x * 0.78, top + 115.0),
+		45.0,
+		Color(1.0, 0.72, 0.30, 0.75)
+	)
+
+	# Montañas lejanas, desplazamiento muy lento.
+	var far_offset := fmod(elapsed * 9.0, 280.0)
+
+	for i in range(-1, 7):
+		var x := float(i) * 280.0 - far_offset
+		var mountain := PackedVector2Array([
+			Vector2(x - 80.0, horizon),
+			Vector2(x + 25.0, horizon - 125.0),
+			Vector2(x + 110.0, horizon - 35.0),
+			Vector2(x + 190.0, horizon)
+		])
+
+		draw_colored_polygon(
+			mountain,
+			Color(0.10, 0.20, 0.22, 1.0)
+		)
+
+	# Colinas medias.
+	var mid_offset := fmod(elapsed * 18.0, 240.0)
+
+	for i in range(-1, 8):
+		var x := float(i) * 240.0 - mid_offset
+		var hill := PackedVector2Array([
+			Vector2(x - 50.0, horizon + 35.0),
+			Vector2(x + 55.0, horizon - 48.0),
+			Vector2(x + 145.0, horizon - 12.0),
+			Vector2(x + 215.0, horizon + 35.0)
+		])
+
+		draw_colored_polygon(
+			hill,
+			Color(0.12, 0.27, 0.23, 1.0)
+		)
+
+	# Llanura.
+	draw_rect(
+		Rect2(
+			0,
+			horizon,
+			size.x,
+			size.y - horizon
+		),
+		Color(0.11, 0.23, 0.16, 1.0)
+	)
+
+	# Acacias en plano medio.
+	var tree_offset := fmod(elapsed * 28.0, 310.0)
+
+	for i in range(-1, 7):
+		var tree_x := float(i) * 310.0 - tree_offset
+		var tree_y := horizon + 18.0
+
+		_draw_acacia(
+			Vector2(tree_x, tree_y),
+			0.75 + float(i % 2) * 0.12
+		)
+
+	# Hierba cercana, la capa más rápida.
+	var grass_offset := fmod(elapsed * 58.0, 54.0)
+
+	for i in range(-1, int(size.x / 54.0) + 2):
+		var x := float(i) * 54.0 - grass_offset
+		var base_y := size.y - 8.0
+
+		draw_line(
+			Vector2(x, base_y),
+			Vector2(x - 8.0, base_y - 27.0),
+			Color(0.24, 0.42, 0.20, 0.85),
+			3.0
+		)
+
+		draw_line(
+			Vector2(x + 7.0, base_y),
+			Vector2(x + 15.0, base_y - 20.0),
+			Color(0.20, 0.36, 0.18, 0.80),
+			2.0
+		)
+
+
+func _draw_acacia(origin: Vector2, scale_factor: float) -> void:
+	var trunk_color := Color(0.16, 0.16, 0.11, 0.95)
+	var leaf_color := Color(0.10, 0.24, 0.14, 0.95)
+
+	draw_line(
+		origin,
+		origin + Vector2(2.0, -72.0) * scale_factor,
+		trunk_color,
+		8.0 * scale_factor
+	)
+
+	draw_line(
+		origin + Vector2(1.0, -47.0) * scale_factor,
+		origin + Vector2(-25.0, -67.0) * scale_factor,
+		trunk_color,
+		4.0 * scale_factor
+	)
+
+	draw_line(
+		origin + Vector2(1.0, -52.0) * scale_factor,
+		origin + Vector2(29.0, -72.0) * scale_factor,
+		trunk_color,
+		4.0 * scale_factor
+	)
+
+	var crown_center := origin + Vector2(2.0, -79.0) * scale_factor
+
+	draw_colored_polygon(
+		_ellipse_background_points(
+			crown_center,
+			Vector2(54.0, 17.0) * scale_factor,
+			24
+		),
+		leaf_color
+	)
+
+
+func _ellipse_background_points(
+	center: Vector2,
+	radius: Vector2,
+	segments: int
+) -> PackedVector2Array:
+	var points := PackedVector2Array()
+
+	for i in range(segments):
+		var angle := TAU * float(i) / float(segments)
+
+		points.append(
+			center + Vector2(
+				cos(angle) * radius.x,
+				sin(angle) * radius.y
+			)
+		)
+
+	return points
 
 
 func _draw_grid(size: Vector2) -> void:

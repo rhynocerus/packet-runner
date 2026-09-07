@@ -1,8 +1,11 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource path="res://scripts/main.gd" type="Script" id="1_main"]
 [ext_resource path="res://scenes/player/rhino_player.tscn" type="PackedScene" id="2_rhino"]
 [ext_resource path="res://assets/audio/music/packet-runner-theme-loop.ogg" type="AudioStream" id="3_music"]
+[ext_resource path="res://assets/audio/sfx/packet-safe.wav" type="AudioStream" id="4_safe"]
+[ext_resource path="res://assets/audio/sfx/malware-hit.wav" type="AudioStream" id="5_malware"]
+[ext_resource path="res://assets/audio/sfx/game-over.wav" type="AudioStream" id="6_gameover"]
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1_main")
@@ -14,3 +17,16 @@ position = Vector2(640, 400)
 stream = ExtResource("3_music")
 volume_db = -3.0
 autoplay = true
+
+[node name="SfxSafe" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("4_safe")
+volume_db = -8.0
+
+[node name="SfxMalware" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("5_malware")
+volume_db = -7.0
+
+[node name="SfxGameOver" type="AudioStreamPlayer" parent="."]
+process_mode = 3
+stream = ExtResource("6_gameover")
+volume_db = -5.0
