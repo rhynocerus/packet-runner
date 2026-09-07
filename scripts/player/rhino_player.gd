@@ -9,11 +9,12 @@ const RHINO_BODY := Color(0.25, 0.43, 0.48, 1.0)
 const RHINO_DARK := Color(0.10, 0.22, 0.27, 1.0)
 const RHINO_LIGHT := Color(0.40, 0.62, 0.64, 1.0)
 
-@export var speed := 330.0
+@export var speed := 360.0
+@export var touch_response := 22.0
 
 var elapsed := 0.0
 
-const TOUCH_DEADZONE := 20.0
+const TOUCH_DEADZONE := 8.0
 
 var touch_active := false
 var touch_index := -1
@@ -61,14 +62,15 @@ func _move(delta: float) -> void:
 	if Input.is_physical_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT):
 		movement.x += 1.0
 
-	# En pantallas táctiles, el rinoceronte sigue el dedo.
+	# En táctil, seguimiento rápido y suave del dedo.
 	if touch_active:
 		var touch_delta := touch_target - position
 
 		if touch_delta.length() > TOUCH_DEADZONE:
-			movement = touch_delta.normalized()
-		else:
-			movement = Vector2.ZERO
+			var follow := 1.0 - exp(-touch_response * delta)
+			position = position.lerp(touch_target, follow)
+
+		movement = Vector2.ZERO
 
 	if movement.length_squared() > 0.0:
 		movement = movement.normalized()
