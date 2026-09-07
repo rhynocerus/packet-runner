@@ -22,6 +22,7 @@ var spawn_elapsed := 0.0
 
 var puntos: int = 0
 var escudo: int = MAX_ESCUDO
+var game_over: bool = false
 
 var puntos_label: Label
 var escudo_label: Label
@@ -40,6 +41,8 @@ func _ready() -> void:
 
 
 func _reset_game_state() -> void:
+	get_tree().paused = false
+	game_over = false
 	puntos = 0
 	escudo = MAX_ESCUDO
 	_update_hud()
@@ -102,6 +105,9 @@ func _create_interface() -> void:
 
 
 func _process(delta: float) -> void:
+	if game_over:
+		return
+
 	elapsed += delta
 	spawn_elapsed += delta
 
@@ -158,6 +164,9 @@ func _on_packet_collected(packet_type: int) -> void:
 
 	_update_hud()
 
+	if escudo <= 0 and not game_over:
+		_show_game_over()
+
 
 func _update_hud() -> void:
 	puntos_label.text = "PUNTOS  %05d" % puntos
@@ -181,6 +190,72 @@ func _update_hud() -> void:
 			"font_color",
 			RED
 		)
+
+func _show_game_over() -> void:
+	game_over = true
+
+	var music := get_node_or_null("BackgroundMusic") as AudioStreamPlayer
+	if music:
+		music.stop()
+
+	var layer := CanvasLayer.new()
+	layer.name = "GameOverLayer"
+	layer.layer = 20
+	layer.process_mode = Node.PROCESS_MODE_WHEN_PAUSED
+	add_child(layer)
+
+	var shade := ColorRect.new()
+	shade.color = Color(0.01, 0.02, 0.04, 0.90)
+	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	shade.mouse_filter = Control.MOUSE_FILTER_STOP
+	layer.add_child(shade)
+
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	layer.add_child(center)
+
+	var content := VBoxContainer.new()
+	content.custom_minimum_size = Vector2(480, 280)
+	content.alignment = BoxContainer.ALIGNMENT_CENTER
+	content.add_theme_constant_override("separation", 18)
+	center.add_child(content)
+
+	var title := Label.new()
+	title.text = "GAME OVER"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 48)
+	title.add_theme_color_override("font_color", RED)
+	content.add_child(title)
+
+	var reason := Label.new()
+	reason.text = "ESCUDO AGOTADO // LA RED HA CAÍDO"
+	reason.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	reason.add_theme_font_size_override("font_size", 18)
+	reason.add_theme_color_override("font_color", CYAN)
+	content.add_child(reason)
+
+	var final_score := Label.new()
+	final_score.text = "PUNTUACIÓN FINAL  %05d" % puntos
+	final_score.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	final_score.add_theme_font_size_override("font_size", 26)
+	final_score.add_theme_color_override("font_color", GREEN)
+	content.add_child(final_score)
+
+	var retry := Button.new()
+	retry.text = "REINTENTAR"
+	retry.custom_minimum_size = Vector2(240, 56)
+	retry.add_theme_font_size_override("font_size", 20)
+	retry.pressed.connect(_retry_game)
+	content.add_child(retry)
+
+	get_tree().paused = true
+
+
+func _retry_game() -> void:
+	get_tree().paused = false
+	get_tree().reload_current_scene()
+
+
 func _draw() -> void:
 	var size := get_viewport_rect().size
 
