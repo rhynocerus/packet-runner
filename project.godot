@@ -1,4 +1,9 @@
 [application]
+boot_splash/minimum_display_time=650
+boot_splash/show_image=true
+boot_splash/bg_color=Color(0.01, 0.03, 0.05, 1)
+boot_splash/image="res://assets/branding/rhynus/rhynus-splash.png"
+config/icon="res://assets/branding/rhynus/rhynus-icon.png"
 
 config/name="Packet Runner"
 config/description="Juego arcade de ciberseguridad protagonizado por un rinoceronte."
@@ -8,8 +13,8 @@ run/main_scene="res://scenes/main.tscn"
 
 window/size/viewport_width=1280
 window/size/viewport_height=720
-window/size/window_width_override=1280
-window/size/window_height_override=720
+window/size/window_width_override=1024
+window/size/window_height_override=576
 window/stretch/mode="canvas_items"
 
 [rendering]
