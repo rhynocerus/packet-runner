@@ -8,6 +8,7 @@ const CYAN := Color(0.0, 0.898, 1.0, 1.0)
 const GREEN := Color(0.192, 0.969, 0.643, 1.0)
 const YELLOW := Color(1.0, 0.820, 0.400, 1.0)
 const RED := Color(1.0, 0.259, 0.427, 1.0)
+const PURPLE := Color(0.72, 0.42, 1.0, 1.0)
 
 const GRID_SIZE := 64
 const SPAWN_INTERVAL := 0.95
@@ -17,7 +18,9 @@ const LEVEL_3_SCORE := 250
 
 const MAX_ESCUDO := 100
 const DANO_MALWARE := 15
-const PUNTOS_SEGURO := 10
+const PUNTOS_SEGURO_NIVEL_1 := 10
+const PUNTOS_SEGURO_NIVEL_2 := 15
+const PUNTOS_SEGURO_NIVEL_3 := 20
 
 var elapsed := 0.0
 var grid_offset := 0.0
@@ -34,6 +37,7 @@ var world_speed_scale: float = 1.0
 var puntos_label: Label
 var escudo_label: Label
 var level_label: Label
+var legend_label: Label
 var pause_button: Button
 var start_layer: CanvasLayer
 var pause_layer: CanvasLayer
@@ -108,15 +112,15 @@ func _create_interface() -> void:
 	escudo_label.add_theme_font_size_override("font_size", 20)
 	add_child(escudo_label)
 
-	var legend := Label.new()
-	legend.text = "● SEGURO +10     ◆ MALWARE -15 ESCUDO"
-	legend.position = Vector2(835, 62)
-	legend.add_theme_font_size_override("font_size", 13)
-	legend.add_theme_color_override(
+	legend_label = Label.new()
+	legend_label.text = "● SEGURO +10     ◆ MALWARE -15 ESCUDO"
+	legend_label.position = Vector2(835, 62)
+	legend_label.add_theme_font_size_override("font_size", 13)
+	legend_label.add_theme_color_override(
 		"font_color",
 		Color(0.78, 0.86, 0.92, 1.0)
 	)
-	add_child(legend)
+	add_child(legend_label)
 
 	var controls := Label.new()
 	controls.text = "PC: WASD + FLECHAS  //  MÓVIL: TOCA Y ARRASTRA"
@@ -897,9 +901,21 @@ func _start_game() -> void:
 	pause_button.visible = true
 	get_tree().paused = false
 
-	var music := get_node_or_null("BackgroundMusic") as AudioStreamPlayer
-	if music and not music.playing:
-		music.play()
+	var music := (
+		get_node_or_null("BackgroundMusic")
+		as AudioStreamPlayer
+	)
+
+	if music:
+		if music.stream is AudioStreamOggVorbis:
+			var ogg_stream := (
+				music.stream
+				as AudioStreamOggVorbis
+			)
+			ogg_stream.loop = true
+
+		if not music.playing:
+			music.play()
 
 
 func _pause_game() -> void:
@@ -1139,10 +1155,12 @@ func _spawn_packet(extra_x: float = 0.0) -> void:
 
 func _on_packet_collected(packet_type: int) -> void:
 	if packet_type == NetworkPacket.PacketType.SAFE:
-		puntos += PUNTOS_SEGURO
+		var safe_points := _get_safe_points()
+		puntos += safe_points
 
 		var safe_sfx := get_node_or_null("SfxSafe") as AudioStreamPlayer
 		if safe_sfx:
+			safe_sfx.pitch_scale = _get_safe_sfx_pitch()
 			safe_sfx.play()
 
 		if OS.is_debug_build():
@@ -1151,6 +1169,9 @@ func _on_packet_collected(packet_type: int) -> void:
 	else:
 		var malware_sfx := get_node_or_null("SfxMalware") as AudioStreamPlayer
 		if malware_sfx:
+			malware_sfx.pitch_scale = (
+				_get_malware_sfx_pitch()
+			)
 			malware_sfx.play()
 
 		escudo = clampi(
@@ -1195,6 +1216,8 @@ func _update_level() -> void:
 		previous_level,
 		current_level
 	)
+
+	_switch_level_music(current_level)
 
 	queue_redraw()
 
@@ -1393,49 +1416,237 @@ func _get_packet_speed_range() -> Vector2:
 			return Vector2(150.0, 260.0)
 
 
+func _get_safe_points() -> int:
+	match current_level:
+		2:
+			return PUNTOS_SEGURO_NIVEL_2
+		3:
+			return PUNTOS_SEGURO_NIVEL_3
+		_:
+			return PUNTOS_SEGURO_NIVEL_1
+
+
+func _get_safe_sfx_pitch() -> float:
+	match current_level:
+		2:
+			return 1.08
+		3:
+			return 1.16
+		_:
+			return 1.0
+
+
+func _get_malware_sfx_pitch() -> float:
+	match current_level:
+		2:
+			return 0.94
+		3:
+			return 0.88
+		_:
+			return 1.0
+
+
+func _get_music_path(level: int) -> String:
+	match level:
+		2:
+			return (
+				"res://assets/audio/music/"
+				+ "packet-runner-level2.ogg"
+			)
+
+		3:
+			return (
+				"res://assets/audio/music/"
+				+ "packet-runner-level3.ogg"
+			)
+
+		_:
+			return (
+				"res://assets/audio/music/"
+				+ "packet-runner-level1.ogg"
+			)
+
+
+func _switch_level_music(level: int) -> void:
+	if not game_started:
+		return
+
+	var music := (
+		get_node_or_null("BackgroundMusic")
+		as AudioStreamPlayer
+	)
+
+	if not music:
+		return
+
+	var path := _get_music_path(level)
+
+	var next_stream := load(path) as AudioStream
+
+	if not next_stream:
+		push_warning(
+			"No se pudo cargar música: "
+			+ path
+		)
+		return
+
+	if next_stream is AudioStreamOggVorbis:
+		var ogg_stream := (
+			next_stream
+			as AudioStreamOggVorbis
+		)
+		ogg_stream.loop = true
+
+	var target_volume := -3.0
+
+	match level:
+		2:
+			target_volume = -2.5
+		3:
+			target_volume = -2.0
+
+	var fade := create_tween()
+
+	fade.tween_property(
+		music,
+		"volume_db",
+		-24.0,
+		0.30
+	)
+
+	fade.tween_callback(
+		func():
+			if not is_instance_valid(music):
+				return
+
+			music.stop()
+			music.stream = next_stream
+			music.play()
+	)
+
+	fade.tween_property(
+		music,
+		"volume_db",
+		target_volume,
+		0.50
+	)
+
+
 func _update_hud() -> void:
+	var points_color := GREEN
+	var shield_base_color := CYAN
+
+	var legend_color := Color(
+		0.78,
+		0.86,
+		0.92,
+		1.0
+	)
+
 	if is_instance_valid(level_label):
 		match current_level:
 			1:
-				level_label.text = "NIVEL 1  //  SABANA"
+				level_label.text = (
+					"NIVEL 1  //  SABANA"
+				)
+
 				level_label.add_theme_color_override(
 					"font_color",
 					GREEN
 				)
+
+				points_color = GREEN
+				shield_base_color = CYAN
+
 			2:
-				level_label.text = "NIVEL 2  //  OCASO"
+				level_label.text = (
+					"NIVEL 2  //  OCASO"
+				)
+
 				level_label.add_theme_color_override(
 					"font_color",
 					YELLOW
 				)
+
+				points_color = YELLOW
+				shield_base_color = GREEN
+
+				legend_color = Color(
+					1.0,
+					0.78,
+					0.40,
+					1.0
+				)
+
 			3:
-				level_label.text = "NIVEL 3  //  TORMENTA"
+				level_label.text = (
+					"NIVEL 3  //  TORMENTA"
+				)
+
 				level_label.add_theme_color_override(
 					"font_color",
 					RED
 				)
 
-	puntos_label.text = "PUNTOS  %05d" % puntos
-	escudo_label.text = "ESCUDO  %d/%d" % [
-		escudo,
-		MAX_ESCUDO
-	]
+				points_color = PURPLE
+				shield_base_color = PURPLE
+
+				legend_color = Color(
+					0.72,
+					0.62,
+					1.0,
+					1.0
+				)
+
+	puntos_label.text = (
+		"PUNTOS  %05d" % puntos
+	)
+
+	puntos_label.add_theme_color_override(
+		"font_color",
+		points_color
+	)
+
+	escudo_label.text = (
+		"ESCUDO  %d/%d"
+		% [
+			escudo,
+			MAX_ESCUDO
+		]
+	)
 
 	if escudo > 60:
 		escudo_label.add_theme_color_override(
 			"font_color",
-			CYAN
+			shield_base_color
 		)
+
 	elif escudo > 40:
 		escudo_label.add_theme_color_override(
 			"font_color",
 			YELLOW
 		)
+
 	else:
 		escudo_label.add_theme_color_override(
 			"font_color",
 			RED
 		)
+
+	if is_instance_valid(legend_label):
+		legend_label.text = (
+			"● SEGURO +%d     "
+			+ "◆ MALWARE -%d ESCUDO"
+		) % [
+			_get_safe_points(),
+			DANO_MALWARE
+		]
+
+		legend_label.add_theme_color_override(
+			"font_color",
+			legend_color
+		)
+
 
 func _show_game_over() -> void:
 	game_over = true

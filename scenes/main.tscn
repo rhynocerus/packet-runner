@@ -2,7 +2,7 @@
 
 [ext_resource path="res://scripts/main.gd" type="Script" id="1_main"]
 [ext_resource path="res://scenes/player/rhino_player.tscn" type="PackedScene" id="2_rhino"]
-[ext_resource path="res://assets/audio/music/packet-runner-theme-loop.ogg" type="AudioStream" id="3_music"]
+[ext_resource path="res://assets/audio/music/packet-runner-level1.ogg" type="AudioStream" id="3_music"]
 [ext_resource path="res://assets/audio/sfx/packet-safe.wav" type="AudioStream" id="4_safe"]
 [ext_resource path="res://assets/audio/sfx/malware-hit.wav" type="AudioStream" id="5_malware"]
 [ext_resource path="res://assets/audio/sfx/game-over.wav" type="AudioStream" id="6_gameover"]
