@@ -22,6 +22,9 @@ const PUNTOS_SEGURO_NIVEL_1 := 10
 const PUNTOS_SEGURO_NIVEL_2 := 15
 const PUNTOS_SEGURO_NIVEL_3 := 20
 
+const FIREWALL_RESTORE := 25
+const BOOST_DURATION := 8.0
+
 var elapsed := 0.0
 var grid_offset := 0.0
 var spawn_elapsed := 0.0
@@ -34,10 +37,14 @@ var game_started: bool = false
 var current_level: int = 1
 var world_speed_scale: float = 1.0
 
+var score_multiplier: int = 1
+var boost_time_left: float = 0.0
+
 var puntos_label: Label
 var escudo_label: Label
 var level_label: Label
 var legend_label: Label
+var tool_status_label: Label
 var pause_button: Button
 var start_layer: CanvasLayer
 var pause_layer: CanvasLayer
@@ -65,7 +72,10 @@ func _reset_game_state() -> void:
 	escudo = MAX_ESCUDO
 	current_level = 1
 	world_speed_scale = 1.0
+	score_multiplier = 1
+	boost_time_left = 0.0
 	_update_hud()
+	_update_tool_status()
 
 	print(
 		"Estado inicial -> Puntos: ",
@@ -121,6 +131,19 @@ func _create_interface() -> void:
 		Color(0.78, 0.86, 0.92, 1.0)
 	)
 	add_child(legend_label)
+
+	tool_status_label = Label.new()
+	tool_status_label.position = Vector2(835, 84)
+	tool_status_label.custom_minimum_size = Vector2(410, 20)
+	tool_status_label.add_theme_font_size_override(
+		"font_size",
+		11
+	)
+	tool_status_label.add_theme_color_override(
+		"font_color",
+		CYAN
+	)
+	add_child(tool_status_label)
 
 	var controls := Label.new()
 	controls.text = "PC: WASD + FLECHAS  //  MÓVIL: TOCA Y ARRASTRA"
@@ -1113,6 +1136,17 @@ func _process(delta: float) -> void:
 	elapsed += delta
 	spawn_elapsed += delta
 
+	if boost_time_left > 0.0:
+		boost_time_left = maxf(
+			0.0,
+			boost_time_left - delta
+		)
+
+		if boost_time_left <= 0.0:
+			score_multiplier = 1
+
+		_update_tool_status()
+
 	grid_offset = fmod(
 		elapsed * 24.0,
 		float(GRID_SIZE)
@@ -1133,14 +1167,38 @@ func _spawn_packet(extra_x: float = 0.0) -> void:
 
 	var type := NetworkPacket.PacketType.SAFE
 
-	if rng.randf() < _get_malware_chance():
+	var roll := rng.randf()
+	var malware_chance := _get_malware_chance()
+	var firewall_chance := _get_firewall_chance()
+	var boost_chance := _get_boost_chance()
+
+	if roll < malware_chance:
 		type = NetworkPacket.PacketType.MALWARE
+
+	elif roll < (
+		malware_chance
+		+ firewall_chance
+	):
+		type = NetworkPacket.PacketType.FIREWALL
+
+	elif roll < (
+		malware_chance
+		+ firewall_chance
+		+ boost_chance
+	):
+		type = NetworkPacket.PacketType.BOOST
 
 	var speed_range := _get_packet_speed_range()
 	var packet_speed := rng.randf_range(
 		speed_range.x,
 		speed_range.y
 	)
+
+	if (
+		type == NetworkPacket.PacketType.FIREWALL
+		or type == NetworkPacket.PacketType.BOOST
+	):
+		packet_speed *= 0.86
 
 	packet.position = Vector2(
 		viewport_size.x + 50.0 + extra_x,
@@ -1154,37 +1212,122 @@ func _spawn_packet(extra_x: float = 0.0) -> void:
 
 
 func _on_packet_collected(packet_type: int) -> void:
-	if packet_type == NetworkPacket.PacketType.SAFE:
-		var safe_points := _get_safe_points()
-		puntos += safe_points
+	match packet_type:
+		NetworkPacket.PacketType.SAFE:
+			var base_points := _get_safe_points()
 
-		var safe_sfx := get_node_or_null("SfxSafe") as AudioStreamPlayer
-		if safe_sfx:
-			safe_sfx.pitch_scale = _get_safe_sfx_pitch()
-			safe_sfx.play()
-
-		if OS.is_debug_build():
-			print("Paquete seguro -> Puntos: ", puntos)
-
-	else:
-		var malware_sfx := get_node_or_null("SfxMalware") as AudioStreamPlayer
-		if malware_sfx:
-			malware_sfx.pitch_scale = (
-				_get_malware_sfx_pitch()
+			var awarded := (
+				base_points
+				* score_multiplier
 			)
-			malware_sfx.play()
 
-		escudo = clampi(
-			escudo - DANO_MALWARE,
-			0,
-			MAX_ESCUDO
-		)
+			puntos += awarded
 
-		if OS.is_debug_build():
-			print("Malware -> Escudo: ", escudo)
+			var safe_sfx := (
+				get_node_or_null("SfxSafe")
+				as AudioStreamPlayer
+			)
+
+			if safe_sfx:
+				safe_sfx.pitch_scale = (
+					_get_safe_sfx_pitch()
+				)
+				safe_sfx.play()
+
+			_show_pickup_feedback(
+				"+%d" % awarded,
+				_get_points_color()
+			)
+
+			if OS.is_debug_build():
+				print(
+					"Paquete seguro -> Puntos: ",
+					puntos
+				)
+
+		NetworkPacket.PacketType.MALWARE:
+			var malware_sfx := (
+				get_node_or_null("SfxMalware")
+				as AudioStreamPlayer
+			)
+
+			if malware_sfx:
+				malware_sfx.pitch_scale = (
+					_get_malware_sfx_pitch()
+				)
+				malware_sfx.play()
+
+			escudo = clampi(
+				escudo - DANO_MALWARE,
+				0,
+				MAX_ESCUDO
+			)
+
+			_show_pickup_feedback(
+				"MALWARE -%d" % DANO_MALWARE,
+				RED
+			)
+
+			if OS.is_debug_build():
+				print(
+					"Malware -> Escudo: ",
+					escudo
+				)
+
+		NetworkPacket.PacketType.FIREWALL:
+			var old_shield := escudo
+
+			escudo = clampi(
+				escudo + FIREWALL_RESTORE,
+				0,
+				MAX_ESCUDO
+			)
+
+			var restored := (
+				escudo - old_shield
+			)
+
+			var firewall_sfx := (
+				get_node_or_null("SfxSafe")
+				as AudioStreamPlayer
+			)
+
+			if firewall_sfx:
+				firewall_sfx.pitch_scale = 0.84
+				firewall_sfx.play()
+
+			if restored > 0:
+				_show_pickup_feedback(
+					"FIREWALL +%d" % restored,
+					CYAN
+				)
+			else:
+				_show_pickup_feedback(
+					"FIREWALL LISTO",
+					CYAN
+				)
+
+		NetworkPacket.PacketType.BOOST:
+			score_multiplier = 2
+			boost_time_left = BOOST_DURATION
+
+			var boost_sfx := (
+				get_node_or_null("SfxSafe")
+				as AudioStreamPlayer
+			)
+
+			if boost_sfx:
+				boost_sfx.pitch_scale = 1.32
+				boost_sfx.play()
+
+			_show_pickup_feedback(
+				"BOOST x2  8s",
+				YELLOW
+			)
 
 	_update_level()
 	_update_hud()
+	_update_tool_status()
 
 	if escudo <= 0 and not game_over:
 		_show_game_over()
@@ -1390,8 +1533,18 @@ func _get_spawn_interval() -> float:
 	match current_level:
 		2:
 			return 0.78
+
 		3:
-			return 0.64
+			var extra_score := maxf(
+				float(puntos - LEVEL_3_SCORE),
+				0.0
+			)
+
+			return maxf(
+				0.48,
+				0.64 - extra_score / 2500.0
+			)
+
 		_:
 			return SPAWN_INTERVAL
 
@@ -1400,10 +1553,40 @@ func _get_malware_chance() -> float:
 	match current_level:
 		2:
 			return 0.34
+
 		3:
-			return 0.42
+			var extra_score := maxf(
+				float(puntos - LEVEL_3_SCORE),
+				0.0
+			)
+
+			return minf(
+				0.55,
+				0.42 + extra_score / 5000.0
+			)
+
 		_:
 			return 0.28
+
+
+func _get_firewall_chance() -> float:
+	match current_level:
+		2:
+			return 0.07
+		3:
+			return 0.08
+		_:
+			return 0.05
+
+
+func _get_boost_chance() -> float:
+	match current_level:
+		2:
+			return 0.05
+		3:
+			return 0.06
+		_:
+			return 0.0
 
 
 func _get_packet_speed_range() -> Vector2:
@@ -1424,6 +1607,121 @@ func _get_safe_points() -> int:
 			return PUNTOS_SEGURO_NIVEL_3
 		_:
 			return PUNTOS_SEGURO_NIVEL_1
+
+
+func _get_points_color() -> Color:
+	match current_level:
+		2:
+			return YELLOW
+		3:
+			return PURPLE
+		_:
+			return GREEN
+
+
+func _update_tool_status() -> void:
+	if not is_instance_valid(tool_status_label):
+		return
+
+	if boost_time_left > 0.0:
+		tool_status_label.text = (
+			"BOOST x2 ACTIVO  //  %ds"
+			% int(ceil(boost_time_left))
+		)
+
+		tool_status_label.add_theme_color_override(
+			"font_color",
+			YELLOW
+		)
+
+	else:
+		tool_status_label.text = (
+			"TOOLS // FIREWALL +25   BOOST x2 8s"
+		)
+
+		tool_status_label.add_theme_color_override(
+			"font_color",
+			Color(
+				CYAN.r,
+				CYAN.g,
+				CYAN.b,
+				0.72
+			)
+		)
+
+
+func _show_pickup_feedback(
+	message: String,
+	color: Color
+) -> void:
+	var player := get_node_or_null(
+		"RhinoPlayer"
+	) as Node2D
+
+	if not player:
+		return
+
+	var feedback := Label.new()
+
+	feedback.text = message
+	feedback.position = (
+		player.position
+		+ Vector2(28.0, -48.0)
+	)
+
+	feedback.z_index = 50
+
+	feedback.add_theme_font_size_override(
+		"font_size",
+		18
+	)
+
+	feedback.add_theme_color_override(
+		"font_color",
+		color
+	)
+
+	feedback.add_theme_color_override(
+		"font_outline_color",
+		Color.BLACK
+	)
+
+	feedback.add_theme_constant_override(
+		"outline_size",
+		4
+	)
+
+	feedback.mouse_filter = (
+		Control.MOUSE_FILTER_IGNORE
+	)
+
+	add_child(feedback)
+
+	var tween := create_tween()
+
+	tween.set_parallel(true)
+
+	tween.tween_property(
+		feedback,
+		"position:y",
+		feedback.position.y - 44.0,
+		0.75
+	).set_trans(
+		Tween.TRANS_QUAD
+	).set_ease(
+		Tween.EASE_OUT
+	)
+
+	tween.tween_property(
+		feedback,
+		"modulate:a",
+		0.0,
+		0.75
+	)
+
+	tween.chain().tween_callback(
+		feedback.queue_free
+	)
 
 
 func _get_safe_sfx_pitch() -> float:
