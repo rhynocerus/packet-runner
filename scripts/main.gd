@@ -153,6 +153,9 @@ func _input(event: InputEvent) -> void:
 func _show_start_screen() -> void:
 	game_started = false
 	pause_button.visible = false
+	get_tree().paused = true
+
+	var viewport_size := get_viewport_rect().size
 
 	start_layer = CanvasLayer.new()
 	start_layer.name = "StartLayer"
@@ -160,49 +163,729 @@ func _show_start_screen() -> void:
 	start_layer.process_mode = Node.PROCESS_MODE_WHEN_PAUSED
 	add_child(start_layer)
 
-	var shade := ColorRect.new()
-	shade.color = Color(0.01, 0.03, 0.05, 0.88)
-	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	start_layer.add_child(shade)
+	var root := Control.new()
+	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	root.mouse_filter = Control.MOUSE_FILTER_STOP
+	start_layer.add_child(root)
 
-	var center := CenterContainer.new()
-	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	start_layer.add_child(center)
+	# Fondo oscuro.
+	var darkness := ColorRect.new()
+	darkness.color = Color(0.004, 0.012, 0.025, 1.0)
+	darkness.set_anchors_and_offsets_preset(
+		Control.PRESET_FULL_RECT
+	)
+	darkness.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(darkness)
 
-	var box := VBoxContainer.new()
-	box.custom_minimum_size = Vector2(560, 330)
-	box.alignment = BoxContainer.ALIGNMENT_CENTER
-	box.add_theme_constant_override("separation", 18)
-	center.add_child(box)
+	# --------------------------------------------------------
+	# BRANDING RHYNUS COMPLETO
+	# --------------------------------------------------------
 
-	var title := Label.new()
-	title.text = "PACKET RUNNER"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 50)
-	title.add_theme_color_override("font_color", CYAN)
-	box.add_child(title)
+	# --------------------------------------------------------
+	# BRANDING RHYNUS COMO SPRITE2D
+	#
+	# La escala se calcula usando el tamaño REAL de la imagen.
+	# Así nunca puede recortarse.
+	# --------------------------------------------------------
+
+	var target_logo_width := minf(
+		viewport_size.x * 0.56,
+		560.0
+	)
+
+	var target_logo_height := minf(
+		viewport_size.y * 0.44,
+		315.0
+	)
+
+	var logo := Sprite2D.new()
+
+	logo.texture = load(
+		"res://assets/branding/rhynus/rhynus-splash.png"
+	) as Texture2D
+
+	var texture_size := logo.texture.get_size()
+
+	var logo_scale_factor := minf(
+		target_logo_width / texture_size.x,
+		target_logo_height / texture_size.y
+	)
+
+	var logo_target_scale := (
+		Vector2.ONE * logo_scale_factor
+	)
+
+	var logo_center_y := (
+		18.0
+		+ target_logo_height * 0.5
+	)
+
+	logo.position = Vector2(
+		viewport_size.x * 0.5,
+		logo_center_y
+	)
+
+	logo.scale = (
+		logo_target_scale * 1.035
+	)
+
+	logo.rotation = deg_to_rad(-0.20)
+	logo.modulate.a = 0.0
+
+	root.add_child(logo)
+
+	# --------------------------------------------------------
+	# PANEL DE JUEGO DEBAJO DEL BRANDING
+	# --------------------------------------------------------
+
+	var panel_width := minf(
+		viewport_size.x - 90.0,
+		620.0
+	)
+
+	var panel_height := 176.0
+
+	var logo_bottom := (
+		logo.position.y
+		+ texture_size.y
+		* logo_target_scale.y
+		* 0.5
+	)
+
+	var desired_panel_y := (
+		logo_bottom + 12.0
+	)
+
+	var panel_y := minf(
+		desired_panel_y,
+		viewport_size.y
+		- panel_height
+		- 18.0
+	)
+
+	var info_panel := Panel.new()
+
+	info_panel.position = Vector2(
+		(viewport_size.x - panel_width) * 0.5,
+		panel_y
+	)
+
+	info_panel.size = Vector2(
+		panel_width,
+		panel_height
+	)
+
+	info_panel.modulate.a = 0.0
+	root.add_child(info_panel)
+
+	var panel_style := StyleBoxFlat.new()
+
+	panel_style.bg_color = Color(
+		0.012,
+		0.050,
+		0.085,
+		0.96
+	)
+
+	panel_style.border_color = Color(
+		CYAN.r,
+		CYAN.g,
+		CYAN.b,
+		0.75
+	)
+
+	panel_style.border_width_left = 2
+	panel_style.border_width_top = 2
+	panel_style.border_width_right = 2
+	panel_style.border_width_bottom = 2
+
+	panel_style.corner_radius_top_left = 18
+	panel_style.corner_radius_top_right = 18
+	panel_style.corner_radius_bottom_left = 18
+	panel_style.corner_radius_bottom_right = 18
+
+	panel_style.shadow_color = Color(
+		0.0,
+		0.0,
+		0.0,
+		0.58
+	)
+
+	panel_style.shadow_size = 14
+	panel_style.shadow_offset = Vector2(0.0, 5.0)
+
+	info_panel.add_theme_stylebox_override(
+		"panel",
+		panel_style
+	)
+
+	var presents := Label.new()
+	presents.text = "PRESENTA"
+	presents.position = Vector2(0.0, 9.0)
+	presents.size = Vector2(panel_width, 18.0)
+	presents.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	presents.add_theme_font_size_override("font_size", 11)
+	presents.add_theme_color_override("font_color", GREEN)
+	presents.modulate.a = 0.0
+	info_panel.add_child(presents)
+
+	# Resplandor de título.
+	var title_glow := Label.new()
+	title_glow.text = "PACKET RUNNER"
+	title_glow.position = Vector2(0.0, 25.0)
+	title_glow.size = Vector2(panel_width, 40.0)
+	title_glow.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+	title_glow.add_theme_font_size_override(
+		"font_size",
+		29
+	)
+
+	title_glow.add_theme_color_override(
+		"font_color",
+		Color(CYAN.r, CYAN.g, CYAN.b, 0.30)
+	)
+
+	title_glow.add_theme_color_override(
+		"font_outline_color",
+		Color(CYAN.r, CYAN.g, CYAN.b, 0.24)
+	)
+
+	title_glow.add_theme_constant_override(
+		"outline_size",
+		10
+	)
+
+	title_glow.modulate.a = 0.0
+	info_panel.add_child(title_glow)
+
+	var game_title := Label.new()
+	game_title.text = "PACKET RUNNER"
+	game_title.position = Vector2(0.0, 25.0)
+	game_title.size = Vector2(panel_width, 40.0)
+	game_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+	game_title.add_theme_font_size_override(
+		"font_size",
+		29
+	)
+
+	game_title.add_theme_color_override(
+		"font_color",
+		CYAN
+	)
+
+	game_title.add_theme_color_override(
+		"font_outline_color",
+		Color(0, 0, 0, 1)
+	)
+
+	game_title.add_theme_constant_override(
+		"outline_size",
+		5
+	)
+
+	game_title.modulate.a = 0.0
+	info_panel.add_child(game_title)
 
 	var subtitle := Label.new()
-	subtitle.text = "DEFIENDE LA RED"
-	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	subtitle.add_theme_font_size_override("font_size", 22)
-	subtitle.add_theme_color_override("font_color", GREEN)
-	box.add_child(subtitle)
+	subtitle.text = (
+		"DEFIENDE LA RED · COME BYTES SEGUROS · "
+		+ "EVITA EL MALWARE"
+	)
 
-	var instructions := Label.new()
-	instructions.text = "ATRAPA PAQUETES SEGUROS // EVITA EL MALWARE"
-	instructions.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	instructions.add_theme_font_size_override("font_size", 16)
-	box.add_child(instructions)
+	subtitle.position = Vector2(0.0, 60.0)
+	subtitle.size = Vector2(panel_width, 20.0)
+	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+	subtitle.add_theme_font_size_override(
+		"font_size",
+		11
+	)
+
+	subtitle.add_theme_color_override(
+		"font_color",
+		Color(0.90, 0.95, 1.0, 1.0)
+	)
+
+	subtitle.modulate.a = 0.0
+	info_panel.add_child(subtitle)
+
+	# --------------------------------------------------------
+	# JUGAR
+	# --------------------------------------------------------
 
 	var play_button := Button.new()
 	play_button.text = "JUGAR"
-	play_button.custom_minimum_size = Vector2(260, 64)
-	play_button.add_theme_font_size_override("font_size", 22)
-	play_button.pressed.connect(_start_game)
-	box.add_child(play_button)
 
-	get_tree().paused = true
+	play_button.size = Vector2(
+		260.0,
+		48.0
+	)
+
+	play_button.position = Vector2(
+		(panel_width - 260.0) * 0.5,
+		88.0
+	)
+
+	play_button.pivot_offset = (
+		play_button.size * 0.5
+	)
+
+	play_button.add_theme_font_size_override(
+		"font_size",
+		19
+	)
+
+	play_button.add_theme_color_override(
+		"font_color",
+		Color.WHITE
+	)
+
+	play_button.add_theme_color_override(
+		"font_outline_color",
+		Color(0, 0, 0, 1)
+	)
+
+	play_button.add_theme_constant_override(
+		"outline_size",
+		4
+	)
+
+	play_button.disabled = true
+	play_button.modulate.a = 0.0
+	play_button.pressed.connect(_start_game)
+
+	_style_rhynus_button(
+		play_button,
+		CYAN
+	)
+
+	info_panel.add_child(play_button)
+
+	var hint := Label.new()
+	hint.text = "PC · MÓVIL · WEB"
+
+	hint.position = Vector2(
+		0.0,
+		144.0
+	)
+
+	hint.size = Vector2(
+		panel_width,
+		18.0
+	)
+
+	hint.horizontal_alignment = (
+		HORIZONTAL_ALIGNMENT_CENTER
+	)
+
+	hint.add_theme_font_size_override(
+		"font_size",
+		11
+	)
+
+	hint.add_theme_color_override(
+		"font_color",
+		Color(0.82, 0.91, 0.97, 1.0)
+	)
+
+	hint.modulate.a = 0.0
+	info_panel.add_child(hint)
+
+	# --------------------------------------------------------
+	# BARRIDOS
+	# --------------------------------------------------------
+
+	var scan_cyan := ColorRect.new()
+
+	scan_cyan.color = Color(
+		CYAN.r,
+		CYAN.g,
+		CYAN.b,
+		0.52
+	)
+
+	scan_cyan.position = Vector2(
+		-20.0,
+		0.0
+	)
+
+	scan_cyan.size = Vector2(
+		5.0,
+		viewport_size.y
+	)
+
+	scan_cyan.modulate.a = 0.0
+	scan_cyan.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(scan_cyan)
+
+	var scan_green := ColorRect.new()
+
+	scan_green.color = Color(
+		GREEN.r,
+		GREEN.g,
+		GREEN.b,
+		0.25
+	)
+
+	scan_green.position = Vector2(
+		-55.0,
+		0.0
+	)
+
+	scan_green.size = Vector2(
+		3.0,
+		viewport_size.y
+	)
+
+	scan_green.modulate.a = 0.0
+	scan_green.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(scan_green)
+
+	# --------------------------------------------------------
+	# ANIMACIÓN DE ENTRADA
+	# --------------------------------------------------------
+
+	var logo_tween := start_layer.create_tween()
+
+	logo_tween.set_pause_mode(
+		Tween.TWEEN_PAUSE_PROCESS
+	)
+
+	logo_tween.set_parallel(true)
+
+	logo_tween.tween_property(
+		logo,
+		"modulate:a",
+		1.0,
+		0.60
+	)
+
+	logo_tween.tween_property(
+		logo,
+		"scale",
+		logo_target_scale,
+		1.55
+	).set_trans(
+		Tween.TRANS_QUINT
+	).set_ease(
+		Tween.EASE_OUT
+	)
+
+	logo_tween.tween_property(
+		logo,
+		"rotation",
+		0.0,
+		1.25
+	)
+
+	var panel_tween := start_layer.create_tween()
+
+	panel_tween.set_pause_mode(
+		Tween.TWEEN_PAUSE_PROCESS
+	)
+
+	panel_tween.tween_interval(0.62)
+
+	panel_tween.tween_property(
+		info_panel,
+		"modulate:a",
+		1.0,
+		0.34
+	)
+
+	var text_tween := start_layer.create_tween()
+
+	text_tween.set_pause_mode(
+		Tween.TWEEN_PAUSE_PROCESS
+	)
+
+	text_tween.tween_interval(0.82)
+
+	text_tween.tween_property(
+		presents,
+		"modulate:a",
+		1.0,
+		0.20
+	)
+
+	text_tween.tween_property(
+		game_title,
+		"modulate:a",
+		1.0,
+		0.25
+	)
+
+	text_tween.parallel().tween_property(
+		title_glow,
+		"modulate:a",
+		0.36,
+		0.25
+	)
+
+	text_tween.parallel().tween_property(
+		subtitle,
+		"modulate:a",
+		1.0,
+		0.25
+	)
+
+	text_tween.tween_property(
+		play_button,
+		"modulate:a",
+		1.0,
+		0.25
+	)
+
+	text_tween.parallel().tween_property(
+		hint,
+		"modulate:a",
+		1.0,
+		0.25
+	)
+
+	text_tween.tween_callback(
+		func():
+			if is_instance_valid(play_button):
+				play_button.disabled = false
+	)
+
+	text_tween.tween_callback(
+		_start_rhynus_idle_animation.bind(
+			logo,
+			play_button,
+			title_glow,
+			logo_target_scale
+		)
+	)
+
+	# --------------------------------------------------------
+	# BARRIDO EN LOOP
+	# --------------------------------------------------------
+
+	var scan_loop := start_layer.create_tween()
+
+	scan_loop.set_pause_mode(
+		Tween.TWEEN_PAUSE_PROCESS
+	)
+
+	scan_loop.set_loops()
+
+	scan_loop.tween_callback(
+		func():
+			scan_cyan.position.x = -20.0
+			scan_green.position.x = -55.0
+			scan_cyan.modulate.a = 0.0
+			scan_green.modulate.a = 0.0
+	)
+
+	scan_loop.tween_interval(0.35)
+
+	scan_loop.tween_property(
+		scan_cyan,
+		"modulate:a",
+		0.68,
+		0.10
+	)
+
+	scan_loop.parallel().tween_property(
+		scan_green,
+		"modulate:a",
+		0.40,
+		0.10
+	)
+
+	scan_loop.parallel().tween_property(
+		scan_cyan,
+		"position:x",
+		viewport_size.x + 30.0,
+		1.00
+	)
+
+	scan_loop.parallel().tween_property(
+		scan_green,
+		"position:x",
+		viewport_size.x + 10.0,
+		1.12
+	)
+
+	scan_loop.tween_property(
+		scan_cyan,
+		"modulate:a",
+		0.0,
+		0.16
+	)
+
+	scan_loop.parallel().tween_property(
+		scan_green,
+		"modulate:a",
+		0.0,
+		0.16
+	)
+
+	scan_loop.tween_interval(0.55)
+
+
+func _style_rhynus_button(
+	button: Button,
+	accent: Color
+) -> void:
+	var normal := StyleBoxFlat.new()
+
+	normal.bg_color = Color(
+		0.025,
+		0.10,
+		0.16,
+		0.98
+	)
+
+	normal.border_color = accent
+
+	normal.border_width_left = 2
+	normal.border_width_top = 2
+	normal.border_width_right = 2
+	normal.border_width_bottom = 2
+
+	normal.corner_radius_top_left = 13
+	normal.corner_radius_top_right = 13
+	normal.corner_radius_bottom_left = 13
+	normal.corner_radius_bottom_right = 13
+
+	normal.shadow_color = Color(
+		0.0,
+		0.0,
+		0.0,
+		0.48
+	)
+	normal.shadow_size = 8
+	normal.shadow_offset = Vector2(0.0, 3.0)
+
+	var hover := normal.duplicate() as StyleBoxFlat
+	hover.bg_color = Color(
+		0.04,
+		0.17,
+		0.24,
+		1.0
+	)
+	hover.border_color = GREEN
+
+	var pressed := normal.duplicate() as StyleBoxFlat
+	pressed.bg_color = Color(
+		0.02,
+		0.07,
+		0.12,
+		1.0
+	)
+	pressed.border_color = YELLOW
+
+	button.add_theme_stylebox_override(
+		"normal",
+		normal
+	)
+	button.add_theme_stylebox_override(
+		"hover",
+		hover
+	)
+	button.add_theme_stylebox_override(
+		"pressed",
+		pressed
+	)
+	button.add_theme_stylebox_override(
+		"focus",
+		hover
+	)
+
+
+func _start_rhynus_idle_animation(
+	logo: Node2D,
+	play_button: Button,
+	title_glow: Label,
+	base_scale: Vector2
+) -> void:
+	if not is_instance_valid(start_layer):
+		return
+
+	if not is_instance_valid(logo):
+		return
+
+	var logo_idle := start_layer.create_tween()
+	logo_idle.set_pause_mode(
+		Tween.TWEEN_PAUSE_PROCESS
+	)
+	logo_idle.set_loops()
+
+	logo_idle.tween_property(
+		logo,
+		"scale",
+		base_scale * 1.010,
+		2.4
+	).set_trans(
+		Tween.TRANS_SINE
+	).set_ease(
+		Tween.EASE_IN_OUT
+	)
+
+	logo_idle.tween_property(
+		logo,
+		"scale",
+		base_scale,
+		2.4
+	).set_trans(
+		Tween.TRANS_SINE
+	).set_ease(
+		Tween.EASE_IN_OUT
+	)
+
+	var button_idle := start_layer.create_tween()
+	button_idle.set_pause_mode(
+		Tween.TWEEN_PAUSE_PROCESS
+	)
+	button_idle.set_loops()
+
+	button_idle.tween_interval(0.55)
+
+	button_idle.tween_property(
+		play_button,
+		"scale",
+		Vector2(1.025, 1.025),
+		0.35
+	).set_trans(
+		Tween.TRANS_SINE
+	)
+
+	button_idle.tween_property(
+		play_button,
+		"scale",
+		Vector2.ONE,
+		0.35
+	).set_trans(
+		Tween.TRANS_SINE
+	)
+
+	button_idle.tween_interval(0.75)
+
+	var sparkle := start_layer.create_tween()
+	sparkle.set_pause_mode(
+		Tween.TWEEN_PAUSE_PROCESS
+	)
+	sparkle.set_loops()
+
+	sparkle.tween_property(
+		title_glow,
+		"modulate:a",
+		0.62,
+		0.22
+	)
+
+	sparkle.tween_property(
+		title_glow,
+		"modulate:a",
+		0.18,
+		0.55
+	)
+
+	sparkle.tween_interval(0.95)
 
 
 func _start_game() -> void:
@@ -229,43 +912,169 @@ func _pause_game() -> void:
 	pause_layer.process_mode = Node.PROCESS_MODE_WHEN_PAUSED
 	add_child(pause_layer)
 
+	var viewport_size := get_viewport_rect().size
+
 	var shade := ColorRect.new()
-	shade.color = Color(0.01, 0.02, 0.04, 0.82)
-	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	shade.color = Color(0.005, 0.015, 0.03, 0.80)
+	shade.set_anchors_and_offsets_preset(
+		Control.PRESET_FULL_RECT
+	)
+	shade.mouse_filter = Control.MOUSE_FILTER_STOP
 	pause_layer.add_child(shade)
 
-	var center := CenterContainer.new()
-	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	pause_layer.add_child(center)
+	var panel := Panel.new()
+	panel.size = Vector2(430.0, 265.0)
+	panel.position = (
+		viewport_size - panel.size
+	) * 0.5
+	pause_layer.add_child(panel)
 
-	var box := VBoxContainer.new()
-	box.custom_minimum_size = Vector2(400, 260)
-	box.alignment = BoxContainer.ALIGNMENT_CENTER
-	box.add_theme_constant_override("separation", 18)
-	center.add_child(box)
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(
+		0.02,
+		0.065,
+		0.11,
+		0.98
+	)
+	style.border_color = Color(
+		CYAN.r,
+		CYAN.g,
+		CYAN.b,
+		0.78
+	)
+
+	style.border_width_left = 2
+	style.border_width_top = 2
+	style.border_width_right = 2
+	style.border_width_bottom = 2
+
+	style.corner_radius_top_left = 20
+	style.corner_radius_top_right = 20
+	style.corner_radius_bottom_left = 20
+	style.corner_radius_bottom_right = 20
+
+	style.shadow_color = Color(0, 0, 0, 0.60)
+	style.shadow_size = 18
+	style.shadow_offset = Vector2(0, 8)
+
+	panel.add_theme_stylebox_override(
+		"panel",
+		style
+	)
+
+	var brand := Label.new()
+	brand.text = "RHYNUS // PACKET RUNNER"
+	brand.position = Vector2(0.0, 20.0)
+	brand.size = Vector2(430.0, 22.0)
+	brand.horizontal_alignment = (
+		HORIZONTAL_ALIGNMENT_CENTER
+	)
+	brand.add_theme_font_size_override(
+		"font_size",
+		12
+	)
+	brand.add_theme_color_override(
+		"font_color",
+		GREEN
+	)
+	panel.add_child(brand)
 
 	var title := Label.new()
 	title.text = "PAUSA"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 44)
-	title.add_theme_color_override("font_color", CYAN)
-	box.add_child(title)
+	title.position = Vector2(0.0, 49.0)
+	title.size = Vector2(430.0, 42.0)
+	title.horizontal_alignment = (
+		HORIZONTAL_ALIGNMENT_CENTER
+	)
+	title.add_theme_font_size_override(
+		"font_size",
+		32
+	)
+	title.add_theme_color_override(
+		"font_color",
+		CYAN
+	)
+	title.add_theme_color_override(
+		"font_outline_color",
+		Color(0, 0, 0, 1)
+	)
+	title.add_theme_constant_override(
+		"outline_size",
+		5
+	)
+	panel.add_child(title)
+
+	var status := Label.new()
+	status.text = (
+		"LA RED QUEDA CONGELADA HASTA TU REGRESO"
+	)
+	status.position = Vector2(0.0, 92.0)
+	status.size = Vector2(430.0, 22.0)
+	status.horizontal_alignment = (
+		HORIZONTAL_ALIGNMENT_CENTER
+	)
+	status.add_theme_font_size_override(
+		"font_size",
+		11
+	)
+	status.add_theme_color_override(
+		"font_color",
+		Color(0.82, 0.90, 0.96, 1.0)
+	)
+	panel.add_child(status)
 
 	var resume := Button.new()
 	resume.text = "CONTINUAR"
-	resume.custom_minimum_size = Vector2(250, 58)
-	resume.add_theme_font_size_override("font_size", 20)
+	resume.size = Vector2(260.0, 48.0)
+	resume.position = Vector2(85.0, 130.0)
+	resume.add_theme_font_size_override(
+		"font_size",
+		18
+	)
+	_style_rhynus_button(resume, CYAN)
 	resume.pressed.connect(_resume_game)
-	box.add_child(resume)
+	panel.add_child(resume)
 
 	var restart := Button.new()
 	restart.text = "REINICIAR"
-	restart.custom_minimum_size = Vector2(250, 58)
-	restart.add_theme_font_size_override("font_size", 20)
+	restart.size = Vector2(260.0, 44.0)
+	restart.position = Vector2(85.0, 191.0)
+	restart.add_theme_font_size_override(
+		"font_size",
+		16
+	)
+	_style_rhynus_button(restart, GREEN)
 	restart.pressed.connect(_restart_from_pause)
-	box.add_child(restart)
+	panel.add_child(restart)
 
 	get_tree().paused = true
+
+	var intro := pause_layer.create_tween()
+	intro.set_pause_mode(
+		Tween.TWEEN_PAUSE_PROCESS
+	)
+
+	panel.scale = Vector2(0.96, 0.96)
+	panel.pivot_offset = panel.size * 0.5
+	panel.modulate.a = 0.0
+
+	intro.tween_property(
+		panel,
+		"modulate:a",
+		1.0,
+		0.18
+	)
+
+	intro.parallel().tween_property(
+		panel,
+		"scale",
+		Vector2.ONE,
+		0.22
+	).set_trans(
+		Tween.TRANS_BACK
+	).set_ease(
+		Tween.EASE_OUT
+	)
 
 
 func _resume_game() -> void:
@@ -371,6 +1180,7 @@ func _update_level() -> void:
 	if new_level == current_level:
 		return
 
+	var previous_level := current_level
 	current_level = new_level
 
 	match current_level:
@@ -381,7 +1191,176 @@ func _update_level() -> void:
 		3:
 			world_speed_scale = 1.55
 
+	_show_level_transition(
+		previous_level,
+		current_level
+	)
+
 	queue_redraw()
+
+
+func _show_level_transition(
+	previous_level: int,
+	new_level: int
+) -> void:
+	var layer := CanvasLayer.new()
+	layer.name = "LevelTransition"
+	layer.layer = 25
+	layer.process_mode = Node.PROCESS_MODE_ALWAYS
+	add_child(layer)
+
+	var viewport_size := get_viewport_rect().size
+
+	var panel := Panel.new()
+	panel.size = Vector2(560.0, 92.0)
+	panel.position = Vector2(
+		(viewport_size.x - 560.0) * 0.5,
+		-110.0
+	)
+	panel.modulate.a = 0.0
+	layer.add_child(panel)
+
+	var accent := YELLOW
+
+	if new_level == 3:
+		accent = RED
+
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(
+		0.015,
+		0.055,
+		0.095,
+		0.96
+	)
+	style.border_color = accent
+
+	style.border_width_left = 2
+	style.border_width_top = 2
+	style.border_width_right = 2
+	style.border_width_bottom = 2
+
+	style.corner_radius_top_left = 16
+	style.corner_radius_top_right = 16
+	style.corner_radius_bottom_left = 16
+	style.corner_radius_bottom_right = 16
+
+	style.shadow_color = Color(0, 0, 0, 0.50)
+	style.shadow_size = 12
+	style.shadow_offset = Vector2(0, 5)
+
+	panel.add_theme_stylebox_override(
+		"panel",
+		style
+	)
+
+	var completed := Label.new()
+	completed.text = (
+		"NIVEL %d SUPERADO" % previous_level
+	)
+	completed.position = Vector2(0.0, 13.0)
+	completed.size = Vector2(560.0, 22.0)
+	completed.horizontal_alignment = (
+		HORIZONTAL_ALIGNMENT_CENTER
+	)
+	completed.add_theme_font_size_override(
+		"font_size",
+		12
+	)
+	completed.add_theme_color_override(
+		"font_color",
+		GREEN
+	)
+	panel.add_child(completed)
+
+	var title := Label.new()
+
+	if new_level == 2:
+		title.text = "NIVEL 2  //  OCASO"
+	else:
+		title.text = "NIVEL 3  //  TORMENTA DIGITAL"
+
+	title.position = Vector2(0.0, 36.0)
+	title.size = Vector2(560.0, 35.0)
+	title.horizontal_alignment = (
+		HORIZONTAL_ALIGNMENT_CENTER
+	)
+	title.add_theme_font_size_override(
+		"font_size",
+		24
+	)
+	title.add_theme_color_override(
+		"font_color",
+		accent
+	)
+	title.add_theme_color_override(
+		"font_outline_color",
+		Color(0, 0, 0, 1)
+	)
+	title.add_theme_constant_override(
+		"outline_size",
+		4
+	)
+	panel.add_child(title)
+
+	var message := Label.new()
+
+	if new_level == 2:
+		message.text = "EL TRÁFICO DE RED AUMENTA"
+	else:
+		message.text = "MÁXIMA AMENAZA // MANTÉN EL ESCUDO"
+
+	message.position = Vector2(0.0, 69.0)
+	message.size = Vector2(560.0, 17.0)
+	message.horizontal_alignment = (
+		HORIZONTAL_ALIGNMENT_CENTER
+	)
+	message.add_theme_font_size_override(
+		"font_size",
+		10
+	)
+	message.add_theme_color_override(
+		"font_color",
+		Color(0.88, 0.93, 0.98, 1.0)
+	)
+	panel.add_child(message)
+
+	var tween := layer.create_tween()
+
+	tween.tween_property(
+		panel,
+		"position:y",
+		122.0,
+		0.38
+	).set_trans(
+		Tween.TRANS_BACK
+	).set_ease(
+		Tween.EASE_OUT
+	)
+
+	tween.parallel().tween_property(
+		panel,
+		"modulate:a",
+		1.0,
+		0.22
+	)
+
+	tween.tween_interval(1.35)
+
+	tween.tween_property(
+		panel,
+		"modulate:a",
+		0.0,
+		0.30
+	)
+
+	tween.parallel().tween_property(
+		panel,
+		"position:y",
+		96.0,
+		0.30
+	)
+
+	tween.tween_callback(layer.queue_free)
 
 
 func _get_spawn_interval() -> float:
