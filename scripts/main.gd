@@ -12,6 +12,9 @@ const RED := Color(1.0, 0.259, 0.427, 1.0)
 const GRID_SIZE := 64
 const SPAWN_INTERVAL := 0.95
 
+const LEVEL_2_SCORE := 100
+const LEVEL_3_SCORE := 250
+
 const MAX_ESCUDO := 100
 const DANO_MALWARE := 15
 const PUNTOS_SEGURO := 10
@@ -25,8 +28,12 @@ var escudo: int = MAX_ESCUDO
 var game_over: bool = false
 var game_started: bool = false
 
+var current_level: int = 1
+var world_speed_scale: float = 1.0
+
 var puntos_label: Label
 var escudo_label: Label
+var level_label: Label
 var pause_button: Button
 var start_layer: CanvasLayer
 var pause_layer: CanvasLayer
@@ -52,6 +59,8 @@ func _reset_game_state() -> void:
 	game_over = false
 	puntos = 0
 	escudo = MAX_ESCUDO
+	current_level = 1
+	world_speed_scale = 1.0
 	_update_hud()
 
 	print(
@@ -79,6 +88,12 @@ func _create_interface() -> void:
 		Color(0.75, 0.84, 0.92, 1.0)
 	)
 	add_child(subtitle)
+
+	level_label = Label.new()
+	level_label.position = Vector2(610, 25)
+	level_label.custom_minimum_size = Vector2(210, 30)
+	level_label.add_theme_font_size_override("font_size", 16)
+	add_child(level_label)
 
 	puntos_label = Label.new()
 	puntos_label.position = Vector2(835, 23)
@@ -278,8 +293,10 @@ func _process(delta: float) -> void:
 		float(GRID_SIZE)
 	)
 
-	if spawn_elapsed >= SPAWN_INTERVAL:
-		spawn_elapsed -= SPAWN_INTERVAL
+	var spawn_interval := _get_spawn_interval()
+
+	if spawn_elapsed >= spawn_interval:
+		spawn_elapsed -= spawn_interval
 		_spawn_packet()
 
 	queue_redraw()
@@ -291,10 +308,14 @@ func _spawn_packet(extra_x: float = 0.0) -> void:
 
 	var type := NetworkPacket.PacketType.SAFE
 
-	if rng.randf() < 0.28:
+	if rng.randf() < _get_malware_chance():
 		type = NetworkPacket.PacketType.MALWARE
 
-	var packet_speed := rng.randf_range(150.0, 260.0)
+	var speed_range := _get_packet_speed_range()
+	var packet_speed := rng.randf_range(
+		speed_range.x,
+		speed_range.y
+	)
 
 	packet.position = Vector2(
 		viewport_size.x + 50.0 + extra_x,
@@ -332,13 +353,89 @@ func _on_packet_collected(packet_type: int) -> void:
 		if OS.is_debug_build():
 			print("Malware -> Escudo: ", escudo)
 
+	_update_level()
 	_update_hud()
 
 	if escudo <= 0 and not game_over:
 		_show_game_over()
 
 
+func _update_level() -> void:
+	var new_level := 1
+
+	if puntos >= LEVEL_3_SCORE:
+		new_level = 3
+	elif puntos >= LEVEL_2_SCORE:
+		new_level = 2
+
+	if new_level == current_level:
+		return
+
+	current_level = new_level
+
+	match current_level:
+		1:
+			world_speed_scale = 1.0
+		2:
+			world_speed_scale = 1.25
+		3:
+			world_speed_scale = 1.55
+
+	queue_redraw()
+
+
+func _get_spawn_interval() -> float:
+	match current_level:
+		2:
+			return 0.78
+		3:
+			return 0.64
+		_:
+			return SPAWN_INTERVAL
+
+
+func _get_malware_chance() -> float:
+	match current_level:
+		2:
+			return 0.34
+		3:
+			return 0.42
+		_:
+			return 0.28
+
+
+func _get_packet_speed_range() -> Vector2:
+	match current_level:
+		2:
+			return Vector2(210.0, 320.0)
+		3:
+			return Vector2(260.0, 390.0)
+		_:
+			return Vector2(150.0, 260.0)
+
+
 func _update_hud() -> void:
+	if is_instance_valid(level_label):
+		match current_level:
+			1:
+				level_label.text = "NIVEL 1  //  SABANA"
+				level_label.add_theme_color_override(
+					"font_color",
+					GREEN
+				)
+			2:
+				level_label.text = "NIVEL 2  //  OCASO"
+				level_label.add_theme_color_override(
+					"font_color",
+					YELLOW
+				)
+			3:
+				level_label.text = "NIVEL 3  //  TORMENTA"
+				level_label.add_theme_color_override(
+					"font_color",
+					RED
+				)
+
 	puntos_label.text = "PUNTOS  %05d" % puntos
 	escudo_label.text = "ESCUDO  %d/%d" % [
 		escudo,
@@ -439,6 +536,7 @@ func _draw() -> void:
 	)
 
 	_draw_savanna_background(size)
+	_draw_level_atmosphere(size)
 	_draw_grid(size)
 
 	draw_rect(
@@ -487,7 +585,7 @@ func _draw_savanna_background(size: Vector2) -> void:
 	)
 
 	# Montañas lejanas, desplazamiento muy lento.
-	var far_offset := fmod(elapsed * 9.0, 280.0)
+	var far_offset := fmod(elapsed * 9.0 * world_speed_scale, 280.0)
 
 	for i in range(-1, 7):
 		var x := float(i) * 280.0 - far_offset
@@ -504,7 +602,7 @@ func _draw_savanna_background(size: Vector2) -> void:
 		)
 
 	# Colinas medias.
-	var mid_offset := fmod(elapsed * 18.0, 240.0)
+	var mid_offset := fmod(elapsed * 18.0 * world_speed_scale, 240.0)
 
 	for i in range(-1, 8):
 		var x := float(i) * 240.0 - mid_offset
@@ -532,7 +630,7 @@ func _draw_savanna_background(size: Vector2) -> void:
 	)
 
 	# Acacias en plano medio.
-	var tree_offset := fmod(elapsed * 28.0, 310.0)
+	var tree_offset := fmod(elapsed * 28.0 * world_speed_scale, 310.0)
 
 	for i in range(-1, 7):
 		var tree_x := float(i) * 310.0 - tree_offset
@@ -544,7 +642,7 @@ func _draw_savanna_background(size: Vector2) -> void:
 		)
 
 	# Hierba cercana, la capa más rápida.
-	var grass_offset := fmod(elapsed * 58.0, 54.0)
+	var grass_offset := fmod(elapsed * 58.0 * world_speed_scale, 54.0)
 
 	for i in range(-1, int(size.x / 54.0) + 2):
 		var x := float(i) * 54.0 - grass_offset
@@ -563,6 +661,99 @@ func _draw_savanna_background(size: Vector2) -> void:
 			Color(0.20, 0.36, 0.18, 0.80),
 			2.0
 		)
+
+
+func _draw_level_atmosphere(size: Vector2) -> void:
+	if current_level == 1:
+		return
+
+	if current_level == 2:
+		# Capa cálida de atardecer.
+		draw_rect(
+			Rect2(0, 110, size.x, size.y - 110),
+			Color(0.55, 0.18, 0.04, 0.16)
+		)
+
+		# Rocas cercanas en movimiento.
+		var rock_offset := fmod(
+			elapsed * 42.0 * world_speed_scale,
+			220.0
+		)
+
+		for i in range(-1, 8):
+			var x := float(i) * 220.0 - rock_offset
+			var y := size.y - 35.0
+
+			var rock := PackedVector2Array([
+				Vector2(x - 34.0, y),
+				Vector2(x - 15.0, y - 31.0),
+				Vector2(x + 17.0, y - 39.0),
+				Vector2(x + 39.0, y),
+			])
+
+			draw_colored_polygon(
+				rock,
+				Color(0.28, 0.16, 0.12, 0.90)
+			)
+
+	elif current_level == 3:
+		# La sabana se convierte visualmente en una red nocturna.
+		draw_rect(
+			Rect2(0, 110, size.x, size.y - 110),
+			Color(0.015, 0.025, 0.10, 0.55)
+		)
+
+		# Líneas digitales horizontales.
+		var scan_offset := fmod(
+			elapsed * 72.0 * world_speed_scale,
+			48.0
+		)
+
+		for y in range(130, int(size.y) + 48, 48):
+			var py := float(y) + scan_offset
+
+			draw_line(
+				Vector2(0, py),
+				Vector2(size.x, py),
+				Color(CYAN.r, CYAN.g, CYAN.b, 0.11),
+				1.0
+			)
+
+		# Trazas luminosas rápidas.
+		var streak_offset := fmod(
+			elapsed * 150.0,
+			260.0
+		)
+
+		for i in range(-1, 7):
+			var x := float(i) * 260.0 - streak_offset
+			var y := 180.0 + float((i * 83) % 420)
+
+			draw_line(
+				Vector2(x, y),
+				Vector2(x + 90.0, y),
+				Color(CYAN.r, CYAN.g, CYAN.b, 0.20),
+				2.0
+			)
+
+		# Relámpago digital ocasional, sin aleatoriedad.
+		var flash := sin(elapsed * 5.5)
+
+		if flash > 0.93:
+			var lightning := PackedVector2Array([
+				Vector2(size.x * 0.72, 125),
+				Vector2(size.x * 0.67, 225),
+				Vector2(size.x * 0.71, 225),
+				Vector2(size.x * 0.64, 355),
+			])
+
+			for i in range(lightning.size() - 1):
+				draw_line(
+					lightning[i],
+					lightning[i + 1],
+					Color(0.60, 0.90, 1.0, 0.75),
+					3.0
+				)
 
 
 func _draw_acacia(origin: Vector2, scale_factor: float) -> void:
