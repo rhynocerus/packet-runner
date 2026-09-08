@@ -6,6 +6,12 @@ Packet Runner is an open Godot project built as a practical software-development
 
 The player controls a rhino moving through a network-inspired arena, collecting safe packets while avoiding malware.
 
+## 🎮 Play online
+
+**GitHub Pages:** https://rhynocerus.github.io/packet-runner/
+
+The browser build is published from the web export included in this repository. For the best experience, use a desktop browser or landscape orientation on mobile.
+
 ## Status
 
 **Prototype: `0.2-dev`**
