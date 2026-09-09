@@ -1,15 +1,72 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=11 format=3]
 
-[ext_resource path="res://scripts/player/rhino_player.gd" type="Script" id="1_rhino"]
+[ext_resource type="Script" path="res://scripts/player/rhino_player.gd" id="1_rhino"]
+[ext_resource type="Texture2D" path="res://assets/player/rhino/rhino_idle.png" id="2_idle"]
+[ext_resource type="Texture2D" path="res://assets/player/rhino/rhino_run_01.png" id="3_run1"]
+[ext_resource type="Texture2D" path="res://assets/player/rhino/rhino_run_02.png" id="4_run2"]
+[ext_resource type="Texture2D" path="res://assets/player/rhino/rhino_run_03.png" id="5_run3"]
+[ext_resource type="Texture2D" path="res://assets/player/rhino/rhino_run_04.png" id="6_run4"]
+[ext_resource type="Texture2D" path="res://assets/player/rhino/rhino_jump.png" id="7_jump"]
+[ext_resource type="Texture2D" path="res://assets/player/rhino/rhino_victory.png" id="8_victory"]
 
 [sub_resource type="CircleShape2D" id="CircleShape_rhino"]
 radius = 51.0
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_rhino"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("2_idle")
+}],
+"loop": true,
+"name": &"idle",
+"speed": 2.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("3_run1")
+}, {
+"duration": 1.0,
+"texture": ExtResource("4_run2")
+}, {
+"duration": 1.0,
+"texture": ExtResource("5_run3")
+}, {
+"duration": 1.0,
+"texture": ExtResource("6_run4")
+}],
+"loop": true,
+"name": &"run",
+"speed": 6.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("7_jump")
+}],
+"loop": false,
+"name": &"jump",
+"speed": 1.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("8_victory")
+}],
+"loop": false,
+"name": &"victory",
+"speed": 1.0
+}]
 
 [node name="RhinoPlayer" type="Area2D" groups=["player"]]
 collision_layer = 1
 collision_mask = 2
 z_index = 10
 script = ExtResource("1_rhino")
+
+[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="."]
+sprite_frames = SubResource("SpriteFrames_rhino")
+animation = &"idle"
+autoplay = "idle"
+scale = Vector2(0.68, 0.68)
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 shape = SubResource("CircleShape_rhino")

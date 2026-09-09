@@ -12,6 +12,11 @@ const RHINO_LIGHT := Color(0.40, 0.62, 0.64, 1.0)
 @export var speed := 360.0
 @export var touch_response := 22.0
 
+@onready var sprite: AnimatedSprite2D = $AnimatedSprite2D
+
+var is_moving := false
+var use_sprite_art := true
+
 var elapsed := 0.0
 
 const TOUCH_DEADZONE := 8.0
@@ -44,6 +49,7 @@ func _input(event: InputEvent) -> void:
 func _process(delta: float) -> void:
 	elapsed += delta
 	_move(delta)
+	_update_animation()
 	queue_redraw()
 
 
@@ -72,6 +78,8 @@ func _move(delta: float) -> void:
 
 		movement = Vector2.ZERO
 
+	is_moving = movement.length_squared() > 0.0 or touch_active
+
 	if movement.length_squared() > 0.0:
 		movement = movement.normalized()
 		position += movement * speed * delta
@@ -89,6 +97,13 @@ func _move(delta: float) -> void:
 		165.0,
 		viewport_size.y - 75.0
 	)
+
+
+func _update_animation() -> void:
+	var target := &"run" if is_moving else &"idle"
+
+	if sprite.animation != target:
+		sprite.play(target)
 
 
 func _ellipse_points(
@@ -112,6 +127,9 @@ func _ellipse_points(
 
 
 func _draw() -> void:
+	if use_sprite_art:
+		return
+
 	var pulse := (sin(elapsed * 4.0) + 1.0) * 0.5
 
 	# Halo sutil
