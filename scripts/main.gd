@@ -228,7 +228,7 @@ func _show_start_screen() -> void:
 	var logo := Sprite2D.new()
 
 	logo.texture = load(
-		"res://assets/branding/rhynus/rhynus-splash.png"
+		"res://assets/branding/rhynus/rhynus-splash-web.png"
 	) as Texture2D
 
 	var texture_size := logo.texture.get_size()
