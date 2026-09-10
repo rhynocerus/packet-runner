@@ -48,8 +48,8 @@ func _build_environment() -> void:
 
 	var camera := Camera3D.new()
 	camera.current = true
-	camera.position = Vector3(0.0, 1.6, 4.8)
-	camera.rotation_degrees = Vector3(-10.0, 0.0, 0.0)
+	camera.position = Vector3(0.0, 1.55, 3.75)
+	camera.rotation_degrees = Vector3(-7.0, 0.0, 0.0)
 	add_child(camera)
 
 func _build_rhino() -> void:
