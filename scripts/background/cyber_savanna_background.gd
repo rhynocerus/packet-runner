@@ -975,40 +975,554 @@ func _draw_level_atmosphere(size: Vector2) -> void:
 			)
 
 
-func _draw_acacia(origin: Vector2, scale_factor: float) -> void:
-	var trunk_color := Color(0.16, 0.16, 0.11, 0.95)
-	var leaf_color := Color(0.10, 0.24, 0.14, 0.95)
+func _draw_acacia(
+	origin: Vector2,
+	scale_factor: float
+) -> void:
+	# ========================================================
+	# PACKET RUNNER // BIOMECHANICAL ACACIA v0.3
+	# Naturaleza y tecnología pertenecen al mismo organismo.
+	# ========================================================
+
+	var bark_dark := Color(0.10, 0.12, 0.10, 0.98)
+	var bark_light := Color(0.19, 0.20, 0.14, 0.94)
+
+	var steel_dark := Color(0.12, 0.18, 0.21, 0.98)
+	var steel_light := Color(0.34, 0.43, 0.48, 0.88)
+
+	var leaf_dark := Color(0.055, 0.17, 0.10, 0.97)
+	var leaf_mid := Color(0.085, 0.25, 0.14, 0.94)
+	var leaf_light := Color(0.12, 0.31, 0.17, 0.86)
+
+	if current_level == 2:
+		leaf_dark = Color(0.13, 0.16, 0.09, 0.97)
+		leaf_mid = Color(0.22, 0.24, 0.10, 0.94)
+		leaf_light = Color(0.31, 0.29, 0.11, 0.84)
+
+	elif current_level >= 3:
+		leaf_dark = Color(0.09, 0.08, 0.12, 0.98)
+		leaf_mid = Color(0.14, 0.11, 0.16, 0.95)
+		leaf_light = Color(0.20, 0.13, 0.18, 0.84)
+
+	var trunk_top := (
+		origin
+		+ Vector2(2.0, -72.0) * scale_factor
+	)
+
+	var left_joint := (
+		origin
+		+ Vector2(1.0, -47.0) * scale_factor
+	)
+
+	var left_tip := (
+		origin
+		+ Vector2(-25.0, -67.0) * scale_factor
+	)
+
+	var right_joint := (
+		origin
+		+ Vector2(1.0, -52.0) * scale_factor
+	)
+
+	var right_tip := (
+		origin
+		+ Vector2(29.0, -72.0) * scale_factor
+	)
+
+	var crown_center := (
+		origin
+		+ Vector2(2.0, -79.0) * scale_factor
+	)
+
+	# --------------------------------------------------------
+	# VARIACIÓN DEL ÁRBOL
+	# Se basa en escala, no en posición horizontal, para que
+	# la infección no cambie mientras la acacia se desplaza.
+	# --------------------------------------------------------
+
+	var tree_variant: int = (
+		int(round(scale_factor * 100.0))
+		% 2
+	)
+
+	var left_energy: Color = CYAN
+	var right_energy: Color = GREEN
+	var trunk_energy: Color = CYAN
+
+	if current_level == 2:
+		if tree_variant == 0:
+			left_energy = RED
+		else:
+			right_energy = RED
+
+	elif current_level >= 3:
+		left_energy = RED
+		right_energy = RED
+
+		if tree_variant == 1:
+			trunk_energy = RED
+
+	# ========================================================
+	# RAÍCES / DATA BUS
+	# ========================================================
+
+	var root_left := (
+		origin
+		+ Vector2(-30.0, 3.0) * scale_factor
+	)
+
+	var root_right := (
+		origin
+		+ Vector2(34.0, 4.0) * scale_factor
+	)
+
+	var root_mid_left := (
+		origin
+		+ Vector2(-15.0, -1.0) * scale_factor
+	)
+
+	var root_mid_right := (
+		origin
+		+ Vector2(17.0, 0.0) * scale_factor
+	)
 
 	draw_line(
 		origin,
-		origin + Vector2(2.0, -72.0) * scale_factor,
-		trunk_color,
-		8.0 * scale_factor
+		root_left,
+		Color(CYAN.r, CYAN.g, CYAN.b, 0.13),
+		maxf(1.0, 1.4 * scale_factor)
 	)
 
 	draw_line(
-		origin + Vector2(1.0, -47.0) * scale_factor,
-		origin + Vector2(-25.0, -67.0) * scale_factor,
-		trunk_color,
-		4.0 * scale_factor
+		origin,
+		root_right,
+		Color(CYAN.r, CYAN.g, CYAN.b, 0.13),
+		maxf(1.0, 1.4 * scale_factor)
 	)
 
 	draw_line(
-		origin + Vector2(1.0, -52.0) * scale_factor,
-		origin + Vector2(29.0, -72.0) * scale_factor,
-		trunk_color,
-		4.0 * scale_factor
+		root_left,
+		root_mid_left,
+		Color(CYAN.r, CYAN.g, CYAN.b, 0.08),
+		maxf(1.0, 1.0 * scale_factor)
 	)
 
-	var crown_center := origin + Vector2(2.0, -79.0) * scale_factor
+	draw_line(
+		root_right,
+		root_mid_right,
+		Color(CYAN.r, CYAN.g, CYAN.b, 0.08),
+		maxf(1.0, 1.0 * scale_factor)
+	)
+
+	draw_circle(
+		root_left,
+		maxf(1.2, 1.8 * scale_factor),
+		Color(CYAN.r, CYAN.g, CYAN.b, 0.48)
+	)
+
+	draw_circle(
+		root_right,
+		maxf(1.2, 1.8 * scale_factor),
+		Color(CYAN.r, CYAN.g, CYAN.b, 0.48)
+	)
+
+	# ========================================================
+	# ESTRUCTURA ORGÁNICA
+	# ========================================================
+
+	# Tronco natural.
+	draw_line(
+		origin,
+		trunk_top,
+		bark_dark,
+		8.5 * scale_factor
+	)
+
+	draw_line(
+		origin + Vector2(-1.0, -2.0) * scale_factor,
+		trunk_top,
+		bark_light,
+		3.0 * scale_factor
+	)
+
+	# Ramas naturales.
+	draw_line(
+		left_joint,
+		left_tip,
+		bark_dark,
+		5.0 * scale_factor
+	)
+
+	draw_line(
+		right_joint,
+		right_tip,
+		bark_dark,
+		5.0 * scale_factor
+	)
+
+	# ========================================================
+	# EXOESQUELETO RHYNUS
+	# Tiras de acero embebidas dentro del árbol.
+	# ========================================================
+
+	draw_line(
+		origin + Vector2(1.0, -7.0) * scale_factor,
+		trunk_top,
+		steel_dark,
+		maxf(1.2, 2.5 * scale_factor)
+	)
+
+	draw_line(
+		origin + Vector2(1.4, -9.0) * scale_factor,
+		trunk_top,
+		steel_light,
+		maxf(0.8, 0.9 * scale_factor)
+	)
+
+	draw_line(
+		left_joint,
+		left_tip,
+		Color(
+			left_energy.r,
+			left_energy.g,
+			left_energy.b,
+			0.52
+		),
+		maxf(0.9, 1.35 * scale_factor)
+	)
+
+	draw_line(
+		right_joint,
+		right_tip,
+		Color(
+			right_energy.r,
+			right_energy.g,
+			right_energy.b,
+			0.52
+		),
+		maxf(0.9, 1.35 * scale_factor)
+	)
+
+	draw_line(
+		origin + Vector2(1.0, -10.0) * scale_factor,
+		trunk_top,
+		Color(
+			trunk_energy.r,
+			trunk_energy.g,
+			trunk_energy.b,
+			0.24
+		),
+		maxf(0.8, 1.1 * scale_factor)
+	)
+
+	# ========================================================
+	# COPA NATURAL MULTICAPA
+	# Conserva claramente la silueta de acacia.
+	# ========================================================
+
+	draw_colored_polygon(
+		_ellipse_background_points(
+			crown_center
+				+ Vector2(-23.0, 2.0) * scale_factor,
+			Vector2(35.0, 14.0) * scale_factor,
+			20
+		),
+		leaf_dark
+	)
+
+	draw_colored_polygon(
+		_ellipse_background_points(
+			crown_center
+				+ Vector2(23.0, 1.0) * scale_factor,
+			Vector2(36.0, 14.0) * scale_factor,
+			20
+		),
+		leaf_dark
+	)
 
 	draw_colored_polygon(
 		_ellipse_background_points(
 			crown_center,
-			Vector2(54.0, 17.0) * scale_factor,
+			Vector2(50.0, 16.0) * scale_factor,
 			24
 		),
-		leaf_color
+		leaf_mid
+	)
+
+	draw_colored_polygon(
+		_ellipse_background_points(
+			crown_center
+				+ Vector2(-5.0, -4.0) * scale_factor,
+			Vector2(34.0, 8.0) * scale_factor,
+			18
+		),
+		leaf_light
+	)
+
+	# Línea tecnológica bajo la copa.
+	draw_line(
+		crown_center + Vector2(-39.0, 8.0) * scale_factor,
+		crown_center + Vector2(37.0, 8.0) * scale_factor,
+		Color(CYAN.r, CYAN.g, CYAN.b, 0.13),
+		maxf(0.8, 1.1 * scale_factor)
+	)
+
+	# ========================================================
+	# ARTICULACIONES
+	# Mismo lenguaje de placas del traje del Rino.
+	# ========================================================
+
+	_draw_acacia_joint(
+		left_joint,
+		scale_factor,
+		left_energy
+	)
+
+	_draw_acacia_joint(
+		right_joint,
+		scale_factor,
+		right_energy
+	)
+
+	_draw_acacia_joint(
+		trunk_top,
+		scale_factor,
+		trunk_energy
+	)
+
+	# Nodos terminales.
+	var terminal_positions: Array[Vector2] = [
+		left_tip,
+		right_tip,
+		crown_center
+	]
+
+	var terminal_colors: Array[Color] = [
+		left_energy,
+		right_energy,
+		trunk_energy
+	]
+
+	for node_index in range(terminal_positions.size()):
+		var node_position: Vector2 = terminal_positions[node_index]
+		var node_color: Color = terminal_colors[node_index]
+
+		draw_circle(
+			node_position,
+			maxf(2.5, 5.0 * scale_factor),
+			Color(
+				node_color.r,
+				node_color.g,
+				node_color.b,
+				0.075
+			)
+		)
+
+		draw_circle(
+			node_position,
+			maxf(1.0, 2.0 * scale_factor),
+			Color(
+				node_color.r,
+				node_color.g,
+				node_color.b,
+				0.82
+			)
+		)
+
+	# ========================================================
+	# PULSOS DE DATOS
+	# ========================================================
+
+	var pulse_phase: float = (
+		elapsed * 0.38
+		+ scale_factor * 1.73
+	)
+
+	var trunk_t: float = fmod(
+		pulse_phase,
+		1.0
+	)
+
+	var left_t: float = fmod(
+		pulse_phase + 0.34,
+		1.0
+	)
+
+	var right_t: float = fmod(
+		pulse_phase + 0.67,
+		1.0
+	)
+
+	var trunk_pulse: Vector2 = origin.lerp(
+		trunk_top,
+		trunk_t
+	)
+
+	var left_pulse: Vector2 = left_joint.lerp(
+		left_tip,
+		left_t
+	)
+
+	var right_pulse: Vector2 = right_joint.lerp(
+		right_tip,
+		right_t
+	)
+
+	_draw_acacia_pulse(
+		trunk_pulse,
+		scale_factor,
+		trunk_energy
+	)
+
+	_draw_acacia_pulse(
+		left_pulse,
+		scale_factor,
+		left_energy
+	)
+
+	_draw_acacia_pulse(
+		right_pulse,
+		scale_factor,
+		right_energy
+	)
+
+	# ========================================================
+	# INFECCIÓN
+	# Nivel 2: una rama empieza a fallar.
+	# Nivel 3: la corrupción alcanza la propia copa.
+	# ========================================================
+
+	if current_level == 2:
+		var infected_tip: Vector2 = right_tip
+
+		if tree_variant == 0:
+			infected_tip = left_tip
+
+		draw_line(
+			infected_tip
+				+ Vector2(-7.0, -3.0) * scale_factor,
+			infected_tip
+				+ Vector2(8.0, 4.0) * scale_factor,
+			Color(RED.r, RED.g, RED.b, 0.46),
+			maxf(1.0, 1.3 * scale_factor)
+		)
+
+	elif current_level >= 3:
+		var glitch_wave: float = (
+			sin(elapsed * 5.0 + scale_factor * 4.0)
+			* 3.0
+			* scale_factor
+		)
+
+		draw_line(
+			crown_center
+				+ Vector2(-38.0, -5.0) * scale_factor,
+			crown_center
+				+ Vector2(-9.0, glitch_wave) * scale_factor,
+			Color(RED.r, RED.g, RED.b, 0.44),
+			maxf(1.0, 1.5 * scale_factor)
+		)
+
+		draw_line(
+			crown_center
+				+ Vector2(8.0, -2.0) * scale_factor,
+			crown_center
+				+ Vector2(41.0, 4.0) * scale_factor,
+			Color(RED.r, RED.g, RED.b, 0.38),
+			maxf(1.0, 1.5 * scale_factor)
+		)
+
+		draw_circle(
+			crown_center
+				+ Vector2(13.0, -2.0) * scale_factor,
+			maxf(2.0, 4.5 * scale_factor),
+			Color(RED.r, RED.g, RED.b, 0.16)
+		)
+
+
+func _draw_acacia_joint(
+	center: Vector2,
+	scale_factor: float,
+	energy_color: Color
+) -> void:
+	var radius: float = maxf(
+		3.0,
+		5.0 * scale_factor
+	)
+
+	var plate := PackedVector2Array([
+		center + Vector2(-radius, -radius * 0.45),
+		center + Vector2(-radius * 0.35, -radius),
+		center + Vector2(radius * 0.55, -radius),
+		center + Vector2(radius, -radius * 0.25),
+		center + Vector2(radius * 0.70, radius * 0.70),
+		center + Vector2(-radius * 0.55, radius)
+	])
+
+	draw_colored_polygon(
+		plate,
+		Color(0.11, 0.17, 0.20, 0.96)
+	)
+
+	var outline := PackedVector2Array([
+		plate[0],
+		plate[1],
+		plate[2],
+		plate[3],
+		plate[4],
+		plate[5],
+		plate[0]
+	])
+
+	draw_polyline(
+		outline,
+		Color(
+			energy_color.r,
+			energy_color.g,
+			energy_color.b,
+			0.62
+		),
+		maxf(1.0, 1.1 * scale_factor),
+		true
+	)
+
+	draw_circle(
+		center,
+		maxf(0.9, 1.5 * scale_factor),
+		Color(
+			energy_color.r,
+			energy_color.g,
+			energy_color.b,
+			0.92
+		)
+	)
+
+
+func _draw_acacia_pulse(
+	position: Vector2,
+	scale_factor: float,
+	energy_color: Color
+) -> void:
+	draw_circle(
+		position,
+		maxf(2.0, 4.2 * scale_factor),
+		Color(
+			energy_color.r,
+			energy_color.g,
+			energy_color.b,
+			0.075
+		)
+	)
+
+	draw_circle(
+		position,
+		maxf(0.9, 1.55 * scale_factor),
+		Color(
+			energy_color.r,
+			energy_color.g,
+			energy_color.b,
+			0.88
+		)
 	)
 
 
@@ -1030,6 +1544,7 @@ func _ellipse_background_points(
 		)
 
 	return points
+
 
 
 func _draw_grid(size: Vector2) -> void:
