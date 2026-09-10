@@ -254,6 +254,13 @@ func _draw_savanna_background(size: Vector2) -> void:
 			Color(0.06, 0.15, 0.10, 0.82)
 		)
 
+
+	# Arquitectura orgánico-tecnológica del horizonte
+	_draw_horizon_architecture(
+		size,
+		horizon
+	)
+
 	# Acacias en plano medio
 	var tree_offset := fmod(
 		elapsed * 31.0 * world_speed_scale,
@@ -459,6 +466,516 @@ func _draw_background_dust(
 			Vector2(x, y),
 			radius,
 			dust_color
+		)
+
+
+func _draw_horizon_architecture(
+	size: Vector2,
+	horizon: float
+) -> void:
+	# ========================================================
+	# CYBER-SAVANNA v0.4
+	# Torres-acacia: infraestructura que creció con el paisaje.
+	# ========================================================
+
+	var spacing: float = 420.0
+
+	var architecture_offset: float = fmod(
+		elapsed * 12.0 * world_speed_scale,
+		spacing
+	)
+
+	var tower_positions: Array[Vector2] = []
+	var tower_colors: Array[Color] = []
+	var tower_corruption: Array[bool] = []
+	var tower_variants: Array[int] = []
+
+	# Primero calculamos todas las torres.
+	for i in range(-1, 5):
+		var variant: int = absi(i) % 3
+
+		var x: float = (
+			float(i) * spacing
+			- architecture_offset
+			+ 115.0
+		)
+
+		var base_y: float = (
+			horizon
+			- 4.0
+			+ float(variant) * 3.0
+		)
+
+		var corrupted: bool = false
+
+		if current_level == 2:
+			corrupted = absi(i) % 4 == 1
+		elif current_level >= 3:
+			corrupted = absi(i) % 2 == 1
+
+		var energy_color: Color = CYAN
+
+		if corrupted:
+			energy_color = RED
+		elif variant == 2:
+			energy_color = GREEN
+
+		tower_positions.append(
+			Vector2(x, base_y)
+		)
+
+		tower_colors.append(
+			energy_color
+		)
+
+		tower_corruption.append(
+			corrupted
+		)
+
+		tower_variants.append(
+			variant
+		)
+
+	# ========================================================
+	# ENLACES ENTRE TORRES
+	# Se dibujan antes para quedar detrás de la estructura.
+	# ========================================================
+
+	for index in range(tower_positions.size() - 1):
+		var a: Vector2 = tower_positions[index]
+		var b: Vector2 = tower_positions[index + 1]
+
+		var link_y_a: Vector2 = (
+			a
+			+ Vector2(
+				0.0,
+				-82.0
+				- float(tower_variants[index]) * 8.0
+			)
+		)
+
+		var link_y_b: Vector2 = (
+			b
+			+ Vector2(
+				0.0,
+				-82.0
+				- float(tower_variants[index + 1]) * 8.0
+			)
+		)
+
+		var link_color: Color = CYAN
+
+		if (
+			tower_corruption[index]
+			or tower_corruption[index + 1]
+		):
+			link_color = RED
+
+		draw_line(
+			link_y_a,
+			link_y_b,
+			Color(
+				link_color.r,
+				link_color.g,
+				link_color.b,
+				0.11
+			),
+			1.0
+		)
+
+		# Pulso viajando entre nodos.
+		var data_t: float = fmod(
+			elapsed * 0.20
+			+ float(index) * 0.23,
+			1.0
+		)
+
+		var data_position: Vector2 = (
+			link_y_a.lerp(
+				link_y_b,
+				data_t
+			)
+		)
+
+		draw_circle(
+			data_position,
+			4.5,
+			Color(
+				link_color.r,
+				link_color.g,
+				link_color.b,
+				0.055
+			)
+		)
+
+		draw_circle(
+			data_position,
+			1.4,
+			Color(
+				link_color.r,
+				link_color.g,
+				link_color.b,
+				0.62
+			)
+		)
+
+	# ========================================================
+	# TORRES
+	# ========================================================
+
+	for index in range(tower_positions.size()):
+		var base: Vector2 = tower_positions[index]
+		var variant: int = tower_variants[index]
+
+		var height: float = (
+			88.0
+			+ float(variant) * 9.0
+		)
+
+		_draw_horizon_tower(
+			base,
+			height,
+			variant,
+			tower_colors[index],
+			tower_corruption[index]
+		)
+
+
+func _draw_horizon_tower(
+	base: Vector2,
+	height: float,
+	variant: int,
+	energy_color: Color,
+	corrupted: bool
+) -> void:
+	var top := (
+		base
+		+ Vector2(0.0, -height)
+	)
+
+	var trunk_dark := Color(
+		0.07,
+		0.12,
+		0.13,
+		0.86
+	)
+
+	var steel := Color(
+		0.24,
+		0.34,
+		0.38,
+		0.58
+	)
+
+	var foliage := Color(
+		0.055,
+		0.16,
+		0.12,
+		0.72
+	)
+
+	if current_level == 2:
+		foliage = Color(
+			0.15,
+			0.17,
+			0.09,
+			0.68
+		)
+
+	elif current_level >= 3:
+		foliage = Color(
+			0.10,
+			0.08,
+			0.13,
+			0.74
+		)
+
+	# --------------------------------------------------------
+	# RAÍCES / ANCLAJES
+	# --------------------------------------------------------
+
+	draw_line(
+		base,
+		base + Vector2(-30.0, 6.0),
+		Color(
+			energy_color.r,
+			energy_color.g,
+			energy_color.b,
+			0.10
+		),
+		1.2
+	)
+
+	draw_line(
+		base,
+		base + Vector2(31.0, 7.0),
+		Color(
+			energy_color.r,
+			energy_color.g,
+			energy_color.b,
+			0.10
+		),
+		1.2
+	)
+
+	# --------------------------------------------------------
+	# COLUMNA ORGÁNICO-METÁLICA
+	# --------------------------------------------------------
+
+	draw_line(
+		base,
+		top,
+		trunk_dark,
+		7.0
+	)
+
+	draw_line(
+		base + Vector2(1.5, -4.0),
+		top,
+		steel,
+		2.0
+	)
+
+	draw_line(
+		base + Vector2(-1.0, -8.0),
+		top,
+		Color(
+			energy_color.r,
+			energy_color.g,
+			energy_color.b,
+			0.25
+		),
+		1.0
+	)
+
+	# --------------------------------------------------------
+	# BRAZOS DE ACACIA / ANTENAS
+	# --------------------------------------------------------
+
+	var branch_y: float = (
+		top.y
+		+ 27.0
+		+ float(variant) * 2.0
+	)
+
+	var left_joint := Vector2(
+		base.x,
+		branch_y
+	)
+
+	var right_joint := Vector2(
+		base.x + 1.0,
+		branch_y + 5.0
+	)
+
+	var left_tip := Vector2(
+		base.x - 34.0 - float(variant) * 4.0,
+		branch_y - 14.0
+	)
+
+	var right_tip := Vector2(
+		base.x + 38.0 + float(variant) * 3.0,
+		branch_y - 11.0
+	)
+
+	draw_line(
+		left_joint,
+		left_tip,
+		trunk_dark,
+		4.0
+	)
+
+	draw_line(
+		right_joint,
+		right_tip,
+		trunk_dark,
+		4.0
+	)
+
+	draw_line(
+		left_joint,
+		left_tip,
+		Color(
+			energy_color.r,
+			energy_color.g,
+			energy_color.b,
+			0.31
+		),
+		1.0
+	)
+
+	draw_line(
+		right_joint,
+		right_tip,
+		Color(
+			energy_color.r,
+			energy_color.g,
+			energy_color.b,
+			0.31
+		),
+		1.0
+	)
+
+	# --------------------------------------------------------
+	# COPA / MATRIZ DE ANTENA
+	# --------------------------------------------------------
+
+	draw_circle(
+		top + Vector2(-24.0, 5.0),
+		22.0,
+		foliage
+	)
+
+	draw_circle(
+		top + Vector2(0.0, 1.0),
+		27.0,
+		foliage
+	)
+
+	draw_circle(
+		top + Vector2(25.0, 6.0),
+		21.0,
+		foliage
+	)
+
+	# Placa central, equivalente a una pieza del traje del Rino.
+	var plate_center := (
+		top
+		+ Vector2(0.0, 6.0)
+	)
+
+	var plate := PackedVector2Array([
+		plate_center + Vector2(-13.0, -5.0),
+		plate_center + Vector2(-8.0, -10.0),
+		plate_center + Vector2(9.0, -10.0),
+		plate_center + Vector2(14.0, -4.0),
+		plate_center + Vector2(10.0, 6.0),
+		plate_center + Vector2(-9.0, 6.0)
+	])
+
+	draw_colored_polygon(
+		plate,
+		Color(
+			0.10,
+			0.17,
+			0.20,
+			0.88
+		)
+	)
+
+	var plate_outline := PackedVector2Array([
+		plate[0],
+		plate[1],
+		plate[2],
+		plate[3],
+		plate[4],
+		plate[5],
+		plate[0]
+	])
+
+	draw_polyline(
+		plate_outline,
+		Color(
+			energy_color.r,
+			energy_color.g,
+			energy_color.b,
+			0.48
+		),
+		1.0,
+		true
+	)
+
+	# --------------------------------------------------------
+	# NÚCLEO DE COMUNICACIONES
+	# --------------------------------------------------------
+
+	var pulse: float = (
+		0.70
+		+ sin(
+			elapsed * 2.0
+			+ float(variant)
+		) * 0.18
+	)
+
+	draw_circle(
+		plate_center,
+		8.0 + pulse * 2.0,
+		Color(
+			energy_color.r,
+			energy_color.g,
+			energy_color.b,
+			0.045
+		)
+	)
+
+	draw_circle(
+		plate_center,
+		2.4,
+		Color(
+			energy_color.r,
+			energy_color.g,
+			energy_color.b,
+			0.78
+		)
+	)
+
+	# Nodos terminales.
+	draw_circle(
+		left_tip,
+		1.7,
+		Color(
+			energy_color.r,
+			energy_color.g,
+			energy_color.b,
+			0.62
+		)
+	)
+
+	draw_circle(
+		right_tip,
+		1.7,
+		Color(
+			energy_color.r,
+			energy_color.g,
+			energy_color.b,
+			0.62
+		)
+	)
+
+	# --------------------------------------------------------
+	# CORRUPCIÓN
+	# --------------------------------------------------------
+
+	if corrupted:
+		var glitch: float = (
+			sin(
+				elapsed * 7.0
+				+ base.x * 0.01
+			)
+			* 4.0
+		)
+
+		draw_line(
+			top + Vector2(-18.0, glitch),
+			top + Vector2(18.0, -glitch),
+			Color(
+				RED.r,
+				RED.g,
+				RED.b,
+				0.34
+			),
+			1.3
+		)
+
+		draw_circle(
+			plate_center + Vector2(glitch, 0.0),
+			3.5,
+			Color(
+				RED.r,
+				RED.g,
+				RED.b,
+				0.18
+			)
 		)
 
 
