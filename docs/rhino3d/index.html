@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="es">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport"
+	      content="width=device-width,initial-scale=1">
+
+	<title>Rhino 3D | Packet Runner</title>
+
+	<script
+		type="module"
+		src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.3.1/model-viewer.min.js">
+	</script>
+
+	<style>
+		* {
+			box-sizing: border-box;
+		}
+
+		html,
+		body {
+			margin: 0;
+			width: 100%;
+			height: 100%;
+			background:
+				radial-gradient(
+					circle at 50% 45%,
+					#17324a 0%,
+					#07111f 55%,
+					#02070d 100%
+				);
+			color: #fff;
+			font-family:
+				system-ui,
+				sans-serif;
+		}
+
+		main {
+			width: 100%;
+			height: 100%;
+			display: grid;
+			grid-template-rows: auto 1fr auto;
+		}
+
+		header {
+			padding: 18px 22px 8px;
+			text-align: center;
+		}
+
+		h1 {
+			margin: 0;
+			font-size: clamp(22px, 4vw, 38px);
+			letter-spacing: .04em;
+		}
+
+		.subtitle {
+			margin-top: 5px;
+			color: #31f7a4;
+		}
+
+		model-viewer {
+			width: 100%;
+			height: 100%;
+			min-height: 520px;
+			background: transparent;
+		}
+
+		footer {
+			padding: 9px 18px 18px;
+			text-align: center;
+			color: #9bb7c8;
+			font-size: 14px;
+		}
+
+		.cyan {
+			color: #00e5ff;
+		}
+	</style>
+</head>
+
+<body>
+<main>
+
+	<header>
+		<h1>PACKET RUNNER · RHINO 3D</h1>
+
+		<div class="subtitle">
+			A Rhynus Project · Prototype v0.8
+		</div>
+	</header>
+
+	<model-viewer
+		src="rhino3d-v0.8.glb"
+		alt="Rhino 3D de Packet Runner"
+		camera-controls
+		auto-rotate
+		auto-rotate-delay="800"
+		rotation-per-second="18deg"
+		shadow-intensity="1"
+		shadow-softness="0.8"
+		camera-orbit="35deg 75deg 105%"
+		touch-action="pan-y">
+	</model-viewer>
+
+	<footer>
+		<span class="cyan">
+			Arrastra para girar · rueda o pellizca para zoom
+		</span>
+		<br>
+		Procedural Godot 4 / GDScript
+	</footer>
+
+</main>
+</body>
+</html>
