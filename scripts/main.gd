@@ -94,18 +94,38 @@ func _reset_game_state() -> void:
 	)
 
 
+const FONT_UI = preload(
+	"res://assets/fonts/UbuntuSans-Variable.ttf"
+)
+
+const FONT_UI_ITALIC = preload(
+	"res://assets/fonts/UbuntuSans-Italic-Variable.ttf"
+)
+
+const FONT_TELEMETRY = preload(
+	"res://assets/fonts/UbuntuSansMono-Variable.ttf"
+)
+
+
 func _create_interface() -> void:
 	var title := Label.new()
 	title.text = "PACKET RUNNER"
-	title.position = Vector2(32, 18)
+	title.position = Vector2(34, 13)
+	title.add_theme_font_override("font", FONT_UI_ITALIC)
 	title.add_theme_font_size_override("font_size", 32)
 	title.add_theme_color_override("font_color", CYAN)
+	title.add_theme_color_override(
+		"font_outline_color",
+		Color(0.0, 0.05, 0.08, 1.0)
+	)
+	title.add_theme_constant_override("outline_size", 6)
 	add_child(title)
 
 	var subtitle := Label.new()
-	subtitle.text = "DEFIENDE LA RED  //  PROTOTIPO 0.2"
-	subtitle.position = Vector2(35, 62)
-	subtitle.add_theme_font_size_override("font_size", 14)
+	subtitle.text = "DEFIENDE LA RED  //  CYBER-SAVANNA ONLINE"
+	subtitle.position = Vector2(36, 62)
+	subtitle.add_theme_font_override("font", FONT_UI_ITALIC)
+	subtitle.add_theme_font_size_override("font_size", 13)
 	subtitle.add_theme_color_override(
 		"font_color",
 		Color(0.75, 0.84, 0.92, 1.0)
@@ -113,28 +133,47 @@ func _create_interface() -> void:
 	add_child(subtitle)
 
 	level_label = Label.new()
-	level_label.position = Vector2(610, 25)
-	level_label.custom_minimum_size = Vector2(210, 30)
-	level_label.add_theme_font_size_override("font_size", 16)
+	level_label.position = Vector2(614, 20)
+	level_label.custom_minimum_size = Vector2(205, 30)
+	level_label.add_theme_font_override("font", FONT_UI_ITALIC)
+	level_label.add_theme_font_size_override("font_size", 15)
+	level_label.add_theme_color_override(
+		"font_outline_color",
+		Color(0, 0, 0, 0.95)
+	)
+	level_label.add_theme_constant_override("outline_size", 3)
 	add_child(level_label)
 
 	puntos_label = Label.new()
-	puntos_label.position = Vector2(835, 23)
-	puntos_label.custom_minimum_size = Vector2(190, 32)
-	puntos_label.add_theme_font_size_override("font_size", 20)
+	puntos_label.position = Vector2(842, 19)
+	puntos_label.custom_minimum_size = Vector2(175, 34)
+	puntos_label.add_theme_font_override("font", FONT_TELEMETRY)
+	puntos_label.add_theme_font_size_override("font_size", 19)
 	puntos_label.add_theme_color_override("font_color", GREEN)
+	puntos_label.add_theme_color_override(
+		"font_outline_color",
+		Color(0, 0, 0, 0.95)
+	)
+	puntos_label.add_theme_constant_override("outline_size", 3)
 	add_child(puntos_label)
 
 	escudo_label = Label.new()
-	escudo_label.position = Vector2(1030, 23)
-	escudo_label.custom_minimum_size = Vector2(220, 32)
-	escudo_label.add_theme_font_size_override("font_size", 20)
+	escudo_label.position = Vector2(1034, 19)
+	escudo_label.custom_minimum_size = Vector2(225, 34)
+	escudo_label.add_theme_font_override("font", FONT_TELEMETRY)
+	escudo_label.add_theme_font_size_override("font_size", 19)
+	escudo_label.add_theme_color_override(
+		"font_outline_color",
+		Color(0, 0, 0, 0.95)
+	)
+	escudo_label.add_theme_constant_override("outline_size", 3)
 	add_child(escudo_label)
 
 	legend_label = Label.new()
 	legend_label.text = "● SEGURO +10     ◆ MALWARE -15 ESCUDO"
-	legend_label.position = Vector2(835, 62)
-	legend_label.add_theme_font_size_override("font_size", 13)
+	legend_label.position = Vector2(836, 64)
+	legend_label.add_theme_font_override("font", FONT_TELEMETRY)
+	legend_label.add_theme_font_size_override("font_size", 12)
 	legend_label.add_theme_color_override(
 		"font_color",
 		Color(0.78, 0.86, 0.92, 1.0)
@@ -142,8 +181,12 @@ func _create_interface() -> void:
 	add_child(legend_label)
 
 	tool_status_label = Label.new()
-	tool_status_label.position = Vector2(835, 84)
-	tool_status_label.custom_minimum_size = Vector2(410, 20)
+	tool_status_label.position = Vector2(614, 84)
+	tool_status_label.custom_minimum_size = Vector2(610, 20)
+	tool_status_label.add_theme_font_override(
+		"font",
+		FONT_TELEMETRY
+	)
 	tool_status_label.add_theme_font_size_override(
 		"font_size",
 		11
@@ -157,6 +200,7 @@ func _create_interface() -> void:
 	var controls := Label.new()
 	controls.text = "PC: WASD + FLECHAS  //  MÓVIL: TOCA Y ARRASTRA"
 	controls.position = Vector2(32, 680)
+	controls.add_theme_font_override("font", FONT_UI)
 	controls.add_theme_font_size_override("font_size", 14)
 	controls.add_theme_color_override("font_color", GREEN)
 	add_child(controls)
@@ -165,6 +209,7 @@ func _create_interface() -> void:
 	pause_button.text = "PAUSA"
 	pause_button.position = Vector2(1145, 655)
 	pause_button.custom_minimum_size = Vector2(105, 48)
+	pause_button.add_theme_font_override("font", FONT_UI)
 	pause_button.add_theme_font_size_override("font_size", 16)
 	pause_button.visible = false
 	pause_button.pressed.connect(_pause_game)
@@ -1456,7 +1501,7 @@ func _show_level_transition(
 	var title := Label.new()
 
 	if new_level == 2:
-		title.text = "NIVEL 2  //  OCASO"
+		title.text = "NIVEL 02  //  OCASO"
 	else:
 		title.text = "NIVEL 3  //  TORMENTA DIGITAL"
 
@@ -1860,7 +1905,7 @@ func _update_hud() -> void:
 		match current_level:
 			1:
 				level_label.text = (
-					"NIVEL 1  //  SABANA"
+					"NIVEL 01  //  SABANA"
 				)
 
 				level_label.add_theme_color_override(
@@ -1893,7 +1938,7 @@ func _update_hud() -> void:
 
 			3:
 				level_label.text = (
-					"NIVEL 3  //  TORMENTA"
+					"NIVEL 03  //  TORMENTA"
 				)
 
 				level_label.add_theme_color_override(
@@ -1921,7 +1966,7 @@ func _update_hud() -> void:
 	)
 
 	escudo_label.text = (
-		"ESCUDO  %d/%d"
+		"ESCUDO  %03d/%03d"
 		% [
 			escudo,
 			MAX_ESCUDO
@@ -2030,20 +2075,337 @@ func _retry_game() -> void:
 	get_tree().reload_current_scene()
 
 
+func _draw_hud_plate(
+	rect: Rect2,
+	fill: Color,
+	border: Color,
+	cut: float = 10.0
+) -> void:
+	var x0: float = rect.position.x
+	var y0: float = rect.position.y
+	var x1: float = rect.end.x
+	var y1: float = rect.end.y
+
+	var points := PackedVector2Array([
+		Vector2(x0 + cut, y0),
+		Vector2(x1 - cut, y0),
+		Vector2(x1, y0 + cut),
+		Vector2(x1, y1 - cut),
+		Vector2(x1 - cut, y1),
+		Vector2(x0 + cut, y1),
+		Vector2(x0, y1 - cut),
+		Vector2(x0, y0 + cut)
+	])
+
+	draw_colored_polygon(points, fill)
+
+	var outline := PackedVector2Array([
+		Vector2(x0 + cut, y0),
+		Vector2(x1 - cut, y0),
+		Vector2(x1, y0 + cut),
+		Vector2(x1, y1 - cut),
+		Vector2(x1 - cut, y1),
+		Vector2(x0 + cut, y1),
+		Vector2(x0, y1 - cut),
+		Vector2(x0, y0 + cut),
+		Vector2(x0 + cut, y0)
+	])
+
+	draw_polyline(
+		outline,
+		border,
+		1.5,
+		true
+	)
+
+
 func _draw() -> void:
 	var size := get_viewport_rect().size
 
-	# El paisaje vive ahora en CyberSavannaBackground.
-	# Main únicamente dibuja la banda superior del HUD.
+	var accent: Color = CYAN
+
+	match current_level:
+		2:
+			accent = YELLOW
+		3:
+			accent = RED
+
+	var pulse: float = (
+		0.72
+		+ sin(elapsed * 2.2) * 0.18
+	)
+
+	# ========================================================
+	# SOMBRA / CARCASA PRINCIPAL
+	# ========================================================
+
 	draw_rect(
-		Rect2(0, 0, size.x, 110),
-		Color(PANEL.r, PANEL.g, PANEL.b, 0.92)
+		Rect2(0, 0, size.x, 112),
+		Color(0.008, 0.025, 0.045, 0.97)
+	)
+
+	draw_rect(
+		Rect2(0, 106, size.x, 8),
+		Color(
+			accent.r,
+			accent.g,
+			accent.b,
+			0.055
+		)
+	)
+
+	# ========================================================
+	# PLACA RHYNUS PRINCIPAL
+	# ========================================================
+
+	_draw_hud_plate(
+		Rect2(14, 10, 560, 88),
+		Color(0.055, 0.095, 0.125, 0.96),
+		Color(CYAN.r, CYAN.g, CYAN.b, 0.50),
+		14.0
+	)
+
+	# Segundo plano de "armadura".
+	_draw_hud_plate(
+		Rect2(21, 17, 546, 74),
+		Color(0.075, 0.125, 0.155, 0.42),
+		Color(0.40, 0.52, 0.60, 0.24),
+		10.0
+	)
+
+	# Nervaduras diagonales de la placa.
+	for i in range(4):
+		var x: float = 465.0 + float(i) * 19.0
+
+		draw_line(
+			Vector2(x, 19.0),
+			Vector2(x + 24.0, 48.0),
+			Color(CYAN.r, CYAN.g, CYAN.b, 0.10),
+			2.0
+		)
+
+	# ========================================================
+	# MÓDULO NIVEL
+	# ========================================================
+
+	_draw_hud_plate(
+		Rect2(596, 10, 218, 48),
+		Color(0.055, 0.095, 0.125, 0.96),
+		Color(accent.r, accent.g, accent.b, 0.48),
+		9.0
+	)
+
+	# ========================================================
+	# MÓDULO PUNTOS
+	# ========================================================
+
+	_draw_hud_plate(
+		Rect2(823, 10, 188, 48),
+		Color(0.055, 0.095, 0.125, 0.96),
+		Color(GREEN.r, GREEN.g, GREEN.b, 0.46),
+		9.0
+	)
+
+	# ========================================================
+	# MÓDULO ESCUDO
+	# ========================================================
+
+	_draw_hud_plate(
+		Rect2(1018, 10, 248, 48),
+		Color(0.055, 0.095, 0.125, 0.96),
+		Color(accent.r, accent.g, accent.b, 0.52),
+		9.0
+	)
+
+	# ========================================================
+	# BARRA INFERIOR DE TELEMETRÍA
+	# ========================================================
+
+	_draw_hud_plate(
+		Rect2(596, 63, 670, 35),
+		Color(0.025, 0.060, 0.085, 0.93),
+		Color(accent.r, accent.g, accent.b, 0.24),
+		8.0
+	)
+
+	# ========================================================
+	# BARRA SEGMENTADA DE ESCUDO
+	# ========================================================
+
+	var shield_ratio: float = clampf(
+		float(escudo) / float(MAX_ESCUDO),
+		0.0,
+		1.0
+	)
+
+	var active_segments: int = int(
+		ceil(shield_ratio * 10.0)
+	)
+
+	var shield_color: Color = GREEN
+
+	if escudo <= 40:
+		shield_color = RED
+	elif escudo <= 60:
+		shield_color = YELLOW
+
+	for segment in range(10):
+		var sx: float = 1035.0 + float(segment) * 20.0
+
+		var segment_color := Color(
+			0.18,
+			0.25,
+			0.29,
+			0.55
+		)
+
+		if segment < active_segments:
+			segment_color = Color(
+				shield_color.r,
+				shield_color.g,
+				shield_color.b,
+				0.72
+			)
+
+		draw_rect(
+			Rect2(sx, 47, 14, 4),
+			segment_color
+		)
+
+	# ========================================================
+	# NODOS DE ENERGÍA
+	# ========================================================
+
+	var node_positions := [
+		Vector2(25, 54),
+		Vector2(565, 54),
+		Vector2(605, 34),
+		Vector2(805, 34),
+		Vector2(832, 34),
+		Vector2(1002, 34),
+		Vector2(1027, 34),
+		Vector2(1257, 34)
+	]
+
+	for node_position in node_positions:
+		draw_circle(
+			node_position,
+			5.0,
+			Color(
+				accent.r,
+				accent.g,
+				accent.b,
+				0.055
+			)
+		)
+
+		draw_circle(
+			node_position,
+			1.8,
+			Color(
+				accent.r,
+				accent.g,
+				accent.b,
+				0.65 + pulse * 0.15
+			)
+		)
+
+	# ========================================================
+	# MICRO DETALLES DE ARMADURA
+	# ========================================================
+
+	draw_line(
+		Vector2(28, 87),
+		Vector2(105, 87),
+		Color(CYAN.r, CYAN.g, CYAN.b, 0.34),
+		2.0
+	)
+
+	draw_line(
+		Vector2(108, 87),
+		Vector2(146, 87),
+		Color(GREEN.r, GREEN.g, GREEN.b, 0.46),
+		2.0
+	)
+
+	draw_line(
+		Vector2(149, 87),
+		Vector2(230, 87),
+		Color(CYAN.r, CYAN.g, CYAN.b, 0.16),
+		2.0
+	)
+
+	# ========================================================
+	# BARRIDO DE TELEMETRÍA
+	# ========================================================
+
+	var scan_x: float = (
+		fmod(
+			elapsed * 74.0,
+			size.x + 260.0
+		)
+		- 130.0
+	)
+
+	draw_rect(
+		Rect2(scan_x, 11, 76, 86),
+		Color(
+			CYAN.r,
+			CYAN.g,
+			CYAN.b,
+			0.016
+		)
+	)
+
+	draw_line(
+		Vector2(scan_x + 38.0, 12.0),
+		Vector2(scan_x + 38.0, 96.0),
+		Color(
+			CYAN.r,
+			CYAN.g,
+			CYAN.b,
+			0.08
+		),
+		1.0
+	)
+
+	# ========================================================
+	# BACKBONE INFERIOR
+	# ========================================================
+
+	draw_line(
+		Vector2(0, 108),
+		Vector2(size.x, 108),
+		Color(
+			accent.r,
+			accent.g,
+			accent.b,
+			0.12
+		),
+		5.0
 	)
 
 	draw_line(
 		Vector2(0, 110),
 		Vector2(size.x, 110),
-		Color(CYAN.r, CYAN.g, CYAN.b, 0.45),
+		Color(
+			accent.r,
+			accent.g,
+			accent.b,
+			0.72
+		),
 		2.0
 	)
+
+	for x in range(48, int(size.x), 160):
+		draw_circle(
+			Vector2(float(x), 110),
+			2.5,
+			Color(
+				accent.r,
+				accent.g,
+				accent.b,
+				0.84
+			)
+		)
 
