@@ -4,7 +4,7 @@
 // Incrementing CACHE_VERSION will kick off the install event and force
 // previously cached resources to be updated from the network.
 /** @type {string} */
-const CACHE_VERSION = '1788958098|2308982';
+const CACHE_VERSION = '1789044084|2301057';
 /** @type {string} */
 const CACHE_PREFIX = 'Packet Runner-sw-cache-';
 const CACHE_NAME = CACHE_PREFIX + CACHE_VERSION;
