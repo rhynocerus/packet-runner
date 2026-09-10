@@ -16,11 +16,19 @@ const PURPLE := Color(0.72, 0.42, 1.0, 1.0)
 
 const GRID_SIZE := 64
 
+# Aproximadamente 2.4 segundos entre estados visuales.
+const LEVEL_TRANSITION_SPEED := 0.42
+
 var elapsed := 0.0
 var grid_offset := 0.0
 
 var current_level: int = 1
 var world_speed_scale: float = 1.0
+
+# current_level controla la lógica.
+# visual_level controla cómo se transforma el ecosistema.
+var visual_level: float = 1.0
+var target_visual_level: float = 1.0
 
 
 func _ready() -> void:
@@ -33,6 +41,12 @@ func _process(delta: float) -> void:
 		return
 
 	elapsed += delta
+
+	visual_level = move_toward(
+		visual_level,
+		target_visual_level,
+		LEVEL_TRANSITION_SPEED * delta
+	)
 
 	grid_offset = fmod(
 		elapsed * 24.0,
@@ -47,8 +61,45 @@ func set_level(
 	speed_scale: float = 1.0
 ) -> void:
 	current_level = clampi(level, 1, 3)
+	target_visual_level = float(current_level)
 	world_speed_scale = maxf(speed_scale, 0.0)
 	queue_redraw()
+
+
+func _blend_level_float(
+	level_1: float,
+	level_2: float,
+	level_3: float
+) -> float:
+	if visual_level <= 2.0:
+		return lerpf(
+			level_1,
+			level_2,
+			clampf(visual_level - 1.0, 0.0, 1.0)
+		)
+
+	return lerpf(
+		level_2,
+		level_3,
+		clampf(visual_level - 2.0, 0.0, 1.0)
+	)
+
+
+func _blend_level_color(
+	level_1: Color,
+	level_2: Color,
+	level_3: Color
+) -> Color:
+	if visual_level <= 2.0:
+		return level_1.lerp(
+			level_2,
+			clampf(visual_level - 1.0, 0.0, 1.0)
+		)
+
+	return level_2.lerp(
+		level_3,
+		clampf(visual_level - 2.0, 0.0, 1.0)
+	)
 
 
 func _draw() -> void:
@@ -69,43 +120,52 @@ func _draw_savanna_background(size: Vector2) -> void:
 	var top := 110.0
 	var horizon := size.y * 0.63
 
-	var sky_colors := [
-		Color(0.055, 0.15, 0.22, 1.0),
-		Color(0.080, 0.22, 0.28, 1.0),
-		Color(0.160, 0.34, 0.33, 1.0),
-		Color(0.380, 0.45, 0.30, 1.0)
+	var sky_colors: Array[Color] = [
+		_blend_level_color(
+			Color(0.055, 0.15, 0.22, 1.0),
+			Color(0.08, 0.08, 0.16, 1.0),
+			Color(0.010, 0.018, 0.060, 1.0)
+		),
+		_blend_level_color(
+			Color(0.080, 0.22, 0.28, 1.0),
+			Color(0.22, 0.10, 0.18, 1.0),
+			Color(0.018, 0.035, 0.095, 1.0)
+		),
+		_blend_level_color(
+			Color(0.160, 0.34, 0.33, 1.0),
+			Color(0.52, 0.19, 0.12, 1.0),
+			Color(0.025, 0.060, 0.120, 1.0)
+		),
+		_blend_level_color(
+			Color(0.380, 0.45, 0.30, 1.0),
+			Color(0.72, 0.36, 0.15, 1.0),
+			Color(0.035, 0.080, 0.120, 1.0)
+		)
 	]
 
-	var sun_color := Color(1.0, 0.78, 0.38, 0.86)
-	var far_color := Color(0.12, 0.24, 0.24, 1.0)
-	var mid_color := Color(0.14, 0.32, 0.24, 1.0)
-	var plain_color := Color(0.13, 0.29, 0.18, 1.0)
+	var sun_color := _blend_level_color(
+		Color(1.0, 0.78, 0.38, 0.86),
+		Color(1.0, 0.40, 0.12, 0.90),
+		Color(0.16, 0.50, 0.65, 0.25)
+	)
 
-	if current_level == 2:
-		sky_colors = [
-			Color(0.08, 0.08, 0.16, 1.0),
-			Color(0.22, 0.10, 0.18, 1.0),
-			Color(0.52, 0.19, 0.12, 1.0),
-			Color(0.72, 0.36, 0.15, 1.0)
-		]
+	var far_color := _blend_level_color(
+		Color(0.12, 0.24, 0.24, 1.0),
+		Color(0.20, 0.10, 0.16, 1.0),
+		Color(0.035, 0.075, 0.12, 1.0)
+	)
 
-		sun_color = Color(1.0, 0.40, 0.12, 0.90)
-		far_color = Color(0.20, 0.10, 0.16, 1.0)
-		mid_color = Color(0.28, 0.13, 0.13, 1.0)
-		plain_color = Color(0.18, 0.13, 0.10, 1.0)
+	var mid_color := _blend_level_color(
+		Color(0.14, 0.32, 0.24, 1.0),
+		Color(0.28, 0.13, 0.13, 1.0),
+		Color(0.035, 0.095, 0.11, 1.0)
+	)
 
-	elif current_level == 3:
-		sky_colors = [
-			Color(0.010, 0.018, 0.060, 1.0),
-			Color(0.018, 0.035, 0.095, 1.0),
-			Color(0.025, 0.060, 0.120, 1.0),
-			Color(0.035, 0.080, 0.120, 1.0)
-		]
-
-		sun_color = Color(0.16, 0.50, 0.65, 0.25)
-		far_color = Color(0.035, 0.075, 0.12, 1.0)
-		mid_color = Color(0.035, 0.095, 0.11, 1.0)
-		plain_color = Color(0.025, 0.075, 0.085, 1.0)
+	var plain_color := _blend_level_color(
+		Color(0.13, 0.29, 0.18, 1.0),
+		Color(0.18, 0.13, 0.10, 1.0),
+		Color(0.025, 0.075, 0.085, 1.0)
+	)
 
 	var band_height := (
 		(horizon - top)
@@ -982,16 +1042,17 @@ func _draw_horizon_tower(
 func _draw_network_ecosystem(size: Vector2) -> void:
 	var horizon := size.y * 0.63
 
-	var network_strength := 0.58
-	var infection_strength := 0.0
+	var network_strength := _blend_level_float(
+		0.58,
+		0.72,
+		0.88
+	)
 
-	match current_level:
-		2:
-			network_strength = 0.72
-			infection_strength = 0.34
-		3:
-			network_strength = 0.88
-			infection_strength = 0.72
+	var infection_strength := _blend_level_float(
+		0.0,
+		0.34,
+		0.72
+	)
 
 	var pulse := (
 		0.72
