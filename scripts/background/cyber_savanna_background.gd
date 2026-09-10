@@ -60,8 +60,9 @@ func _draw() -> void:
 	)
 
 	_draw_savanna_background(size)
-	_draw_level_atmosphere(size)
 	_draw_grid(size)
+	_draw_network_ecosystem(size)
+	_draw_level_atmosphere(size)
 
 
 func _draw_savanna_background(size: Vector2) -> void:
@@ -69,16 +70,16 @@ func _draw_savanna_background(size: Vector2) -> void:
 	var horizon := size.y * 0.63
 
 	var sky_colors := [
-		Color(0.035, 0.10, 0.16, 1.0),
-		Color(0.055, 0.16, 0.22, 1.0),
-		Color(0.12, 0.25, 0.28, 1.0),
-		Color(0.25, 0.34, 0.27, 1.0)
+		Color(0.055, 0.15, 0.22, 1.0),
+		Color(0.080, 0.22, 0.28, 1.0),
+		Color(0.160, 0.34, 0.33, 1.0),
+		Color(0.380, 0.45, 0.30, 1.0)
 	]
 
-	var sun_color := Color(1.0, 0.72, 0.30, 0.78)
-	var far_color := Color(0.10, 0.20, 0.22, 1.0)
-	var mid_color := Color(0.12, 0.27, 0.23, 1.0)
-	var plain_color := Color(0.11, 0.23, 0.16, 1.0)
+	var sun_color := Color(1.0, 0.78, 0.38, 0.86)
+	var far_color := Color(0.12, 0.24, 0.24, 1.0)
+	var mid_color := Color(0.14, 0.32, 0.24, 1.0)
+	var plain_color := Color(0.13, 0.29, 0.18, 1.0)
 
 	if current_level == 2:
 		sky_colors = [
@@ -458,6 +459,282 @@ func _draw_background_dust(
 			Vector2(x, y),
 			radius,
 			dust_color
+		)
+
+
+func _draw_network_ecosystem(size: Vector2) -> void:
+	var horizon := size.y * 0.63
+
+	var network_strength := 0.58
+	var infection_strength := 0.0
+
+	match current_level:
+		2:
+			network_strength = 0.72
+			infection_strength = 0.34
+		3:
+			network_strength = 0.88
+			infection_strength = 0.72
+
+	var pulse := (
+		0.72
+		+ sin(elapsed * 2.2) * 0.18
+	)
+
+	var network_color := Color(
+		CYAN.r,
+		CYAN.g,
+		CYAN.b,
+		0.18 * network_strength
+	)
+
+	var node_color := Color(
+		CYAN.r,
+		CYAN.g,
+		CYAN.b,
+		0.48 * network_strength
+	)
+
+	var danger_color := Color(
+		RED.r,
+		RED.g,
+		RED.b,
+		0.52 * infection_strength
+	)
+
+	# --------------------------------------------------------
+	# BACKBONE DE RED SOBRE EL HORIZONTE
+	# --------------------------------------------------------
+
+	draw_line(
+		Vector2(0.0, horizon - 11.0),
+		Vector2(size.x, horizon - 11.0),
+		network_color,
+		1.5
+	)
+
+	# --------------------------------------------------------
+	# NODOS / ACACIAS TECNOLÓGICAS LEJANAS
+	# --------------------------------------------------------
+
+	var node_offset := fmod(
+		elapsed * 10.0 * world_speed_scale,
+		245.0
+	)
+
+	for i in range(-1, 7):
+		var x := float(i) * 245.0 - node_offset
+
+		var y := (
+			horizon
+			- 29.0
+			- sin(elapsed * 0.65 + float(i)) * 5.0
+		)
+
+		var corrupted: bool = (
+			current_level >= 2
+			and abs(i) % 3 == 1
+		)
+
+		var color := node_color
+
+		if corrupted:
+			color = danger_color
+
+		# Tronco de datos
+		draw_line(
+			Vector2(x, horizon - 10.0),
+			Vector2(x, y),
+			color,
+			1.5
+		)
+
+		# Ramas-circuito
+		draw_line(
+			Vector2(x, y + 8.0),
+			Vector2(x - 21.0, y + 16.0),
+			color,
+			1.2
+		)
+
+		draw_line(
+			Vector2(x, y + 8.0),
+			Vector2(x + 24.0, y + 14.0),
+			color,
+			1.2
+		)
+
+		draw_circle(
+			Vector2(x, y),
+			6.0 + pulse * 1.4,
+			Color(
+				color.r,
+				color.g,
+				color.b,
+				color.a * 0.30
+			)
+		)
+
+		draw_circle(
+			Vector2(x, y),
+			2.4,
+			Color(
+				color.r,
+				color.g,
+				color.b,
+				minf(color.a * 2.2, 0.95)
+			)
+		)
+
+		draw_circle(
+			Vector2(x - 21.0, y + 16.0),
+			1.8,
+			color
+		)
+
+		draw_circle(
+			Vector2(x + 24.0, y + 14.0),
+			1.8,
+			color
+		)
+
+	# --------------------------------------------------------
+	# RUTAS DE DATOS EN LA SABANA
+	# Perspectiva desde el horizonte hacia el jugador.
+	# --------------------------------------------------------
+
+	for route in range(4):
+		var base_x := (
+			size.x
+			* (0.16 + float(route) * 0.22)
+		)
+
+		var route_bias := float(route) - 1.5
+
+		for segment in range(8):
+			var y0 := (
+				horizon
+				+ 24.0
+				+ float(segment) * 39.0
+			)
+
+			var y1 := y0 + 23.0
+
+			var drift := sin(
+				elapsed * 0.65
+				+ float(segment) * 0.55
+				+ float(route)
+			) * 4.0
+
+			var spread0 := (
+				(y0 - horizon)
+				* route_bias
+				* 0.14
+			)
+
+			var spread1 := (
+				(y1 - horizon)
+				* route_bias
+				* 0.14
+			)
+
+			var line_color := Color(
+				CYAN.r,
+				CYAN.g,
+				CYAN.b,
+				0.070 * network_strength
+			)
+
+			if (
+				current_level >= 2
+				and route == 2
+				and segment % 3 == 1
+			):
+				line_color = Color(
+					RED.r,
+					RED.g,
+					RED.b,
+					0.080 * infection_strength
+				)
+
+			draw_line(
+				Vector2(
+					base_x + spread0 + drift,
+					y0
+				),
+				Vector2(
+					base_x + spread1 + drift,
+					y1
+				),
+				line_color,
+				1.4
+			)
+
+	# --------------------------------------------------------
+	# PACKETS AMBIENTALES
+	# Pequeñas luciérnagas digitales.
+	# --------------------------------------------------------
+
+	for i in range(8):
+		var speed := (
+			0.055
+			+ float(i % 3) * 0.012
+		)
+
+		var progress := fmod(
+			elapsed
+			* speed
+			* world_speed_scale
+			+ float(i) * 0.137,
+			1.0
+		)
+
+		var x := (
+			size.x * 1.08
+			- progress * size.x * 1.18
+		)
+
+		var y := (
+			horizon
+			- 48.0
+			- float((i * 31) % 95)
+			+ sin(elapsed * 1.1 + float(i)) * 4.0
+		)
+
+		var packet_color := Color(
+			GREEN.r,
+			GREEN.g,
+			GREEN.b,
+			0.42
+		)
+
+		if (
+			current_level >= 2
+			and i % 4 == 1
+		):
+			packet_color = Color(
+				RED.r,
+				RED.g,
+				RED.b,
+				0.40 * maxf(infection_strength, 0.25)
+			)
+
+		draw_line(
+			Vector2(x + 5.0, y),
+			Vector2(x + 18.0, y),
+			Color(
+				packet_color.r,
+				packet_color.g,
+				packet_color.b,
+				packet_color.a * 0.30
+			),
+			1.2
+		)
+
+		draw_circle(
+			Vector2(x, y),
+			2.6,
+			packet_color
 		)
 
 
