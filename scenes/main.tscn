@@ -1,4 +1,4 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource path="res://scripts/main.gd" type="Script" id="1_main"]
 [ext_resource path="res://scenes/player/rhino_player.tscn" type="PackedScene" id="2_rhino"]
@@ -6,9 +6,12 @@
 [ext_resource path="res://assets/audio/sfx/packet-safe.wav" type="AudioStream" id="4_safe"]
 [ext_resource path="res://assets/audio/sfx/malware-hit.wav" type="AudioStream" id="5_malware"]
 [ext_resource path="res://assets/audio/sfx/game-over.wav" type="AudioStream" id="6_gameover"]
+[ext_resource path="res://scenes/background/cyber_savanna_background.tscn" type="PackedScene" id="7_background"]
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1_main")
+
+[node name="CyberSavannaBackground" parent="." instance=ExtResource("7_background")]
 
 [node name="RhinoPlayer" parent="." instance=ExtResource("2_rhino")]
 position = Vector2(640, 400)
