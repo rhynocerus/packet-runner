@@ -1,7 +1,7 @@
 extends Node3D
 
 # Packet Runner 3D
-# Vertical Slice v0.4 // Levels + Boost + Rich Terrain
+# Vertical Slice v0.6.1 // Cyber UI Motion Polish
 #
 # Primer prototipo jugable:
 # - Cyber-Savanna procedural
@@ -32,6 +32,19 @@ const MUSIC_LEVEL3: AudioStream = preload(
 
 const RHYNUS_SPLASH: Texture2D = preload(
 	"res://assets/branding/rhynus/rhynus-splash-web.png"
+)
+
+
+const FONT_UI: Font = preload(
+	"res://assets/fonts/UbuntuSans-Variable.ttf"
+)
+
+const FONT_UI_ITALIC: Font = preload(
+	"res://assets/fonts/UbuntuSans-Italic-Variable.ttf"
+)
+
+const FONT_TELEMETRY: Font = preload(
+	"res://assets/fonts/UbuntuSansMono-Variable.ttf"
 )
 
 const SFX_PACKET: AudioStream = preload(
@@ -96,6 +109,13 @@ var game_state: int = GameState.MENU
 var player: Node3D
 var camera: Camera3D
 
+var world_environment: Environment
+var main_sun_light: DirectionalLight3D
+
+var savanna_material: StandardMaterial3D
+var road_material: StandardMaterial3D
+var horizon_sun_material: StandardMaterial3D
+
 var target_lane: int = 1
 var forward_input: float = 0.0
 
@@ -119,6 +139,11 @@ var shield: int = 100
 var current_level: int = 1
 var boost_remaining: float = 0.0
 
+var last_milestone_score: int = 0
+var event_remaining: float = 0.0
+var event_tween: Tween
+var overlay_tween: Tween
+
 var rng := RandomNumberGenerator.new()
 
 # UI
@@ -134,8 +159,18 @@ var firewall_label: Label
 var shield_label: Label
 var shield_bar: ProgressBar
 var boost_label: Label
+var event_label: Label
 
 var brand_overlay: ColorRect
+
+var scan_line: ColorRect
+
+var animated_titles: Array[Label] = []
+var animated_buttons: Array[Button] = []
+
+var ui_motion_elapsed: float = 0.0
+var scan_y: float = -8.0
+var intro_scan_passes: int = 0
 
 var pause_button: Button
 var game_over_score: Label
@@ -159,6 +194,8 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	_update_ui_motion(delta)
+
 	if Input.is_action_just_pressed("ui_cancel"):
 		if (
 			game_state == GameState.PLAYING
@@ -183,7 +220,10 @@ func _process(delta: float) -> void:
 
 	_update_pickups(delta)
 	_update_spawning(delta)
+
 	_update_status(delta)
+	_update_event_feedback(delta)
+	_update_level_visuals(delta)
 
 
 # ============================================================
@@ -196,6 +236,7 @@ func _start_game() -> void:
 
 	current_level = 1
 	boost_remaining = 0.0
+	last_milestone_score = 0
 
 	target_lane = 1
 	spawn_elapsed = 0.0
@@ -266,7 +307,25 @@ func _show_menu() -> void:
 
 func _show_info() -> void:
 	menu_overlay.hide()
+
+	info_overlay.modulate.a = 0.0
 	info_overlay.show()
+
+	if is_instance_valid(overlay_tween):
+		overlay_tween.kill()
+
+	overlay_tween = create_tween()
+
+	overlay_tween.tween_property(
+		info_overlay,
+		"modulate:a",
+		1.0,
+		0.28
+	).set_trans(
+		Tween.TRANS_QUAD
+	).set_ease(
+		Tween.EASE_OUT
+	)
 
 
 func _hide_info() -> void:
@@ -468,20 +527,54 @@ func _update_camera(delta: float) -> void:
 	if not is_instance_valid(camera):
 		return
 
+	var target_camera_y: float = 3.45
+	var target_camera_z: float = 7.20
+	var target_fov: float = 70.0
+	var look_ahead: float = -4.5
+
+	if boost_remaining > 0.0:
+		# Durante el boost nos acercamos al Rino
+		# y abrimos ligeramente el campo visual.
+		target_camera_y = 3.00
+		target_camera_z = 6.00
+		target_fov = 75.0
+		look_ahead = -6.0
+
+	var blend: float = clampf(
+		delta * 2.5,
+		0.0,
+		1.0
+	)
+
 	camera.position.x = lerpf(
 		camera.position.x,
 		player.position.x * 0.18,
-		minf(
-			1.0,
-			CAMERA_FOLLOW_SPEED * delta
-		)
+		blend
+	)
+
+	camera.position.y = lerpf(
+		camera.position.y,
+		target_camera_y,
+		blend
+	)
+
+	camera.position.z = lerpf(
+		camera.position.z,
+		target_camera_z,
+		blend
+	)
+
+	camera.fov = lerpf(
+		camera.fov,
+		target_fov,
+		blend
 	)
 
 	camera.look_at(
 		Vector3(
 			player.position.x * 0.12,
 			1.15,
-			player.position.z - 4.5
+			player.position.z + look_ahead
 		),
 		Vector3.UP
 	)
@@ -562,42 +655,49 @@ func _build_world() -> void:
 func _build_environment() -> void:
 	var world_env := WorldEnvironment.new()
 
-	var environment := Environment.new()
+	world_environment = Environment.new()
 
-	environment.background_mode = (
+	world_environment.background_mode = (
 		Environment.BG_COLOR
 	)
 
-	environment.background_color = BG
+	world_environment.background_color = BG
 
-	environment.ambient_light_source = (
+	world_environment.ambient_light_source = (
 		Environment.AMBIENT_SOURCE_COLOR
 	)
 
-	environment.ambient_light_color = Color(
+	world_environment.ambient_light_color = Color(
 		0.38,
 		0.48,
 		0.58,
 		1.0
 	)
 
-	environment.ambient_light_energy = 1.25
+	world_environment.ambient_light_energy = 1.25
 
-	world_env.environment = environment
+	world_env.environment = world_environment
 	add_child(world_env)
 
-	var sun_light := DirectionalLight3D.new()
+	main_sun_light = DirectionalLight3D.new()
 
-	sun_light.rotation_degrees = Vector3(
+	main_sun_light.rotation_degrees = Vector3(
 		-48.0,
 		25.0,
 		0.0
 	)
 
-	sun_light.light_energy = 1.9
-	sun_light.shadow_enabled = true
+	main_sun_light.light_color = Color(
+		1.0,
+		0.84,
+		0.62,
+		1.0
+	)
 
-	add_child(sun_light)
+	main_sun_light.light_energy = 1.9
+	main_sun_light.shadow_enabled = true
+
+	add_child(main_sun_light)
 
 	camera = Camera3D.new()
 
@@ -606,6 +706,8 @@ func _build_environment() -> void:
 		3.45,
 		7.2
 	)
+
+	camera.fov = 70.0
 
 	add_child(camera)
 
@@ -632,17 +734,20 @@ func _build_ground() -> void:
 	)
 
 	savanna_mesh.mesh = savanna_plane
+
 	savanna_mesh.position = Vector3(
 		0.0,
 		-0.04,
 		-18.0
 	)
 
+	savanna_material = _make_material(
+		SAVANNA,
+		Color.BLACK
+	)
+
 	savanna_mesh.material_override = (
-		_make_material(
-			SAVANNA,
-			Color.BLACK
-		)
+		savanna_material
 	)
 
 	add_child(savanna_mesh)
@@ -664,11 +769,13 @@ func _build_ground() -> void:
 		-18.0
 	)
 
+	road_material = _make_material(
+		ROAD,
+		Color.BLACK
+	)
+
 	road_mesh.material_override = (
-		_make_material(
-			ROAD,
-			Color.BLACK
-		)
+		road_material
 	)
 
 	add_child(road_mesh)
@@ -1189,7 +1296,7 @@ func _build_horizon() -> void:
 		-30.0
 	)
 
-	sun.material_override = _make_material(
+	horizon_sun_material = _make_material(
 		YELLOW,
 		Color(
 			1.0,
@@ -1197,6 +1304,10 @@ func _build_horizon() -> void:
 			0.12,
 			1.0
 		)
+	)
+
+	sun.material_override = (
+		horizon_sun_material
 	)
 
 	add_child(sun)
@@ -2071,7 +2182,15 @@ func _collect_pickup(
 		"packet":
 			score += PACKET_SCORE
 
+			_check_score_milestone()
+
 			_play_safe_sfx(1.0)
+
+			_show_event_feedback(
+				"✓ PAQUETE SEGURO  +10",
+				GREEN,
+				0.85
+			)
 
 			_set_status(
 				"PAQUETE SEGURO // +%d"
@@ -2081,6 +2200,12 @@ func _collect_pickup(
 
 		"shield":
 			_play_safe_sfx(1.22)
+
+			_show_event_feedback(
+				"🛡 ESCUDO DE RED  +20",
+				CYAN,
+				1.35
+			)
 
 			shield = mini(
 				100,
@@ -2098,6 +2223,12 @@ func _collect_pickup(
 
 			_play_safe_sfx(1.38)
 
+			_show_event_feedback(
+				"⚡ BOOST DE RED",
+				YELLOW,
+				1.30
+			)
+
 			_set_status(
 				"⚡ BOOST DE RED // 5 SEG",
 				1.8
@@ -2106,6 +2237,12 @@ func _collect_pickup(
 		"malware":
 			sfx_malware.pitch_scale = 1.0
 			sfx_malware.play()
+
+			_show_event_feedback(
+				"⚠ MALWARE  -25 ESCUDO",
+				RED,
+				1.45
+			)
 
 			shield = maxi(
 				0,
@@ -2139,6 +2276,223 @@ func _update_boost(delta: float) -> void:
 	_update_hud()
 
 
+func _update_level_visuals(
+	delta: float
+) -> void:
+	if (
+		world_environment == null
+		or savanna_material == null
+		or road_material == null
+		or horizon_sun_material == null
+	):
+		return
+
+	var target_bg := Color(
+		0.015,
+		0.035,
+		0.060,
+		1.0
+	)
+
+	var target_ambient := Color(
+		0.38,
+		0.48,
+		0.58,
+		1.0
+	)
+
+	var target_savanna := Color(
+		0.11,
+		0.22,
+		0.13,
+		1.0
+	)
+
+	var target_road := Color(
+		0.035,
+		0.075,
+		0.085,
+		1.0
+	)
+
+	var target_sun := YELLOW
+
+	var target_light := Color(
+		1.0,
+		0.84,
+		0.62,
+		1.0
+	)
+
+	var target_ambient_energy: float = 1.25
+	var target_light_energy: float = 1.90
+
+	match current_level:
+		2:
+			# Infection Front:
+			# ocaso cálido, suelo enfermo,
+			# tecnología bajo tensión.
+			target_bg = Color(
+				0.085,
+				0.025,
+				0.045,
+				1.0
+			)
+
+			target_ambient = Color(
+				0.52,
+				0.25,
+				0.18,
+				1.0
+			)
+
+			target_savanna = Color(
+				0.19,
+				0.12,
+				0.075,
+				1.0
+			)
+
+			target_road = Color(
+				0.085,
+				0.045,
+				0.052,
+				1.0
+			)
+
+			target_sun = Color(
+				1.0,
+				0.36,
+				0.10,
+				1.0
+			)
+
+			target_light = Color(
+				1.0,
+				0.42,
+				0.18,
+				1.0
+			)
+
+			target_ambient_energy = 1.12
+			target_light_energy = 2.10
+
+		3:
+			# Redline Savanna:
+			# noche tecnológica / infección crítica.
+			target_bg = Color(
+				0.008,
+				0.012,
+				0.040,
+				1.0
+			)
+
+			target_ambient = Color(
+				0.19,
+				0.24,
+				0.38,
+				1.0
+			)
+
+			target_savanna = Color(
+				0.035,
+				0.075,
+				0.080,
+				1.0
+			)
+
+			target_road = Color(
+				0.030,
+				0.045,
+				0.070,
+				1.0
+			)
+
+			target_sun = Color(
+				0.14,
+				0.44,
+				0.62,
+				1.0
+			)
+
+			target_light = Color(
+				0.28,
+				0.56,
+				0.88,
+				1.0
+			)
+
+			target_ambient_energy = 0.92
+			target_light_energy = 1.30
+
+	var blend: float = clampf(
+		delta * 1.45,
+		0.0,
+		1.0
+	)
+
+	world_environment.background_color = (
+		world_environment.background_color.lerp(
+			target_bg,
+			blend
+		)
+	)
+
+	world_environment.ambient_light_color = (
+		world_environment.ambient_light_color.lerp(
+			target_ambient,
+			blend
+		)
+	)
+
+	world_environment.ambient_light_energy = lerpf(
+		world_environment.ambient_light_energy,
+		target_ambient_energy,
+		blend
+	)
+
+	savanna_material.albedo_color = (
+		savanna_material.albedo_color.lerp(
+			target_savanna,
+			blend
+		)
+	)
+
+	road_material.albedo_color = (
+		road_material.albedo_color.lerp(
+			target_road,
+			blend
+		)
+	)
+
+	horizon_sun_material.albedo_color = (
+		horizon_sun_material.albedo_color.lerp(
+			target_sun,
+			blend
+		)
+	)
+
+	horizon_sun_material.emission = (
+		horizon_sun_material.emission.lerp(
+			target_sun,
+			blend
+		)
+	)
+
+	main_sun_light.light_color = (
+		main_sun_light.light_color.lerp(
+			target_light,
+			blend
+		)
+	)
+
+	main_sun_light.light_energy = lerpf(
+		main_sun_light.light_energy,
+		target_light_energy,
+		blend
+	)
+
+
 func _update_level_progression() -> void:
 	var target_level := 1
 
@@ -2153,7 +2507,37 @@ func _update_level_progression() -> void:
 
 	current_level = target_level
 
+	if player.has_method("celebrate"):
+		player.call(
+			"celebrate",
+			1.7
+		)
+
 	_apply_level_change()
+
+
+func _check_score_milestone() -> void:
+	var milestone: int = (
+		floori(
+			float(score)
+			/ 100.0
+		)
+		* 100
+	)
+
+	if (
+		milestone < 100
+		or milestone <= last_milestone_score
+	):
+		return
+
+	last_milestone_score = milestone
+
+	if player.has_method("celebrate"):
+		player.call(
+			"celebrate",
+			0.85
+		)
 
 
 func _apply_level_change() -> void:
@@ -2240,11 +2624,263 @@ func _build_ui() -> void:
 
 	canvas.add_child(ui_root)
 
+	var ui_theme := Theme.new()
+	ui_theme.default_font = FONT_UI
+	ui_root.theme = ui_theme
+
 	_build_brand_splash()
 	_build_hud()
 	_build_menu()
 	_build_info()
 	_build_game_over()
+	_build_ui_motion_fx()
+
+
+func _style_title(
+	label: Label
+) -> void:
+	label.add_theme_font_override(
+		"font",
+		FONT_UI_ITALIC
+	)
+
+	label.add_theme_color_override(
+		"font_outline_color",
+		Color(
+			CYAN.r,
+			CYAN.g,
+			CYAN.b,
+			0.55
+		)
+	)
+
+	label.add_theme_constant_override(
+		"outline_size",
+		2
+	)
+
+	animated_titles.append(label)
+
+
+func _style_italic(
+	label: Label
+) -> void:
+	label.add_theme_font_override(
+		"font",
+		FONT_UI_ITALIC
+	)
+
+
+func _style_telemetry(
+	label: Label
+) -> void:
+	label.add_theme_font_override(
+		"font",
+		FONT_TELEMETRY
+	)
+
+
+func _style_button(
+	button: Button
+) -> void:
+	button.add_theme_font_override(
+		"font",
+		FONT_UI
+	)
+
+
+func _build_ui_motion_fx() -> void:
+	scan_line = ColorRect.new()
+
+	scan_line.name = "CyberScanLine"
+
+	scan_line.mouse_filter = (
+		Control.MOUSE_FILTER_IGNORE
+	)
+
+	scan_line.set_anchors_preset(
+		Control.PRESET_TOP_WIDE
+	)
+
+	scan_line.offset_top = 0.0
+	scan_line.offset_bottom = 3.0
+
+	scan_line.color = Color(
+		CYAN.r,
+		CYAN.g,
+		CYAN.b,
+		0.12
+	)
+
+	ui_root.add_child(scan_line)
+
+	scan_line.move_to_front()
+
+
+func _update_ui_motion(
+	delta: float
+) -> void:
+	ui_motion_elapsed += delta
+
+	# --------------------------------------------------------
+	# Respiración de títulos
+	# --------------------------------------------------------
+
+	var pulse: float = (
+		0.5
+		+ 0.5
+		* sin(
+			ui_motion_elapsed * 2.6
+		)
+	)
+
+	for title in animated_titles:
+		if not is_instance_valid(title):
+			continue
+
+		title.modulate = Color(
+			1.0,
+			1.0,
+			1.0,
+			0.86
+			+ pulse * 0.14
+		)
+
+		title.add_theme_color_override(
+			"font_outline_color",
+			Color(
+				CYAN.r,
+				CYAN.g,
+				CYAN.b,
+				0.22
+				+ pulse * 0.58
+			)
+		)
+
+		title.add_theme_constant_override(
+			"outline_size",
+			1
+			+ int(
+				round(
+					pulse * 2.0
+				)
+			)
+		)
+
+	# --------------------------------------------------------
+	# Botones respirando con desfase
+	# --------------------------------------------------------
+
+	for i in range(
+		animated_buttons.size()
+	):
+		var button := animated_buttons[i]
+
+		if not is_instance_valid(button):
+			continue
+
+		var button_pulse: float = (
+			0.5
+			+ 0.5
+			* sin(
+				ui_motion_elapsed * 2.1
+				+ float(i) * 0.55
+			)
+		)
+
+		button.modulate = Color(
+			1.0,
+			1.0,
+			1.0,
+			0.88
+			+ button_pulse * 0.12
+		)
+
+	# --------------------------------------------------------
+	# Parpadeo tipo terminal
+	# --------------------------------------------------------
+
+	if is_instance_valid(
+		firewall_label
+	):
+		var terminal_phase: float = fmod(
+			ui_motion_elapsed,
+			1.55
+		)
+
+		var terminal_alpha: float = 1.0
+
+		if terminal_phase < 0.065:
+			terminal_alpha = 0.54
+
+		firewall_label.modulate.a = (
+			terminal_alpha
+		)
+
+	# --------------------------------------------------------
+	# Scan line
+	# --------------------------------------------------------
+
+	if not is_instance_valid(
+		scan_line
+	):
+		return
+
+	var scan_speed: float = 155.0
+
+	var scan_alpha: float = (
+		0.055
+		+ pulse * 0.040
+	)
+
+	# Durante la intro hacemos tres barridos más visibles.
+	if (
+		is_instance_valid(
+			brand_overlay
+		)
+		and brand_overlay.visible
+		and intro_scan_passes > 0
+	):
+		scan_speed = 720.0
+		scan_alpha = 0.25
+
+	scan_y += (
+		scan_speed * delta
+	)
+
+	var screen_height: float = (
+		get_viewport().get_visible_rect().size.y
+	)
+
+	if scan_y > screen_height:
+		scan_y = -8.0
+
+		if (
+			is_instance_valid(
+				brand_overlay
+			)
+			and brand_overlay.visible
+			and intro_scan_passes > 0
+		):
+			intro_scan_passes -= 1
+
+	scan_line.position.y = scan_y
+
+	var scan_color := CYAN
+
+	match current_level:
+		2:
+			scan_color = YELLOW
+
+		3:
+			scan_color = RED
+
+	scan_line.color = Color(
+		scan_color.r,
+		scan_color.g,
+		scan_color.b,
+		scan_alpha
+	)
 
 
 func _build_brand_splash() -> void:
@@ -2299,32 +2935,14 @@ func _build_brand_splash() -> void:
 
 	box.add_child(logo)
 
-	var label := Label.new()
-
-	label.text = (
-		"RHYNUS INTERACTIVE WORKS"
-	)
-
-	label.horizontal_alignment = (
-		HORIZONTAL_ALIGNMENT_CENTER
-	)
-
-	label.add_theme_color_override(
-		"font_color",
-		CYAN
-	)
-
-	label.add_theme_font_size_override(
-		"font_size",
-		18
-	)
-
-	box.add_child(label)
 
 	brand_overlay.hide()
 
 
 func _show_brand_splash() -> void:
+	intro_scan_passes = 3
+	scan_y = -8.0
+
 	menu_overlay.hide()
 	info_overlay.hide()
 	game_over_overlay.hide()
@@ -2351,6 +2969,7 @@ func _build_hud() -> void:
 	ui_root.add_child(hud)
 
 	var title := Label.new()
+	_style_title(title)
 
 	title.text = "PACKET RUNNER 3D"
 
@@ -2367,6 +2986,7 @@ func _build_hud() -> void:
 	hud.add_child(title)
 
 	level_label = Label.new()
+	_style_italic(level_label)
 
 	level_label.text = (
 		"NIVEL 01 // SABANA CONECTADA"
@@ -2380,9 +3000,11 @@ func _build_hud() -> void:
 	hud.add_child(level_label)
 
 	score_label = Label.new()
+	_style_telemetry(score_label)
 	hud.add_child(score_label)
 
 	shield_label = Label.new()
+	_style_telemetry(shield_label)
 	hud.add_child(shield_label)
 
 	shield_bar = ProgressBar.new()
@@ -2423,6 +3045,7 @@ func _build_hud() -> void:
 	hud.add_child(shield_bar)
 
 	boost_label = Label.new()
+	_style_italic(boost_label)
 
 	boost_label.add_theme_color_override(
 		"font_color",
@@ -2431,7 +3054,50 @@ func _build_hud() -> void:
 
 	hud.add_child(boost_label)
 
+	event_label = Label.new()
+	_style_italic(event_label)
+
+	event_label.text = ""
+
+	event_label.horizontal_alignment = (
+		HORIZONTAL_ALIGNMENT_CENTER
+	)
+
+	event_label.set_anchors_preset(
+		Control.PRESET_CENTER_TOP
+	)
+
+	event_label.offset_left = -260.0
+	event_label.offset_top = 82.0
+	event_label.offset_right = 260.0
+	event_label.offset_bottom = 128.0
+
+	event_label.add_theme_font_size_override(
+		"font_size",
+		24
+	)
+
+	event_label.add_theme_color_override(
+		"font_outline_color",
+		Color(
+			0.0,
+			0.0,
+			0.0,
+			0.92
+		)
+	)
+
+	event_label.add_theme_constant_override(
+		"outline_size",
+		4
+	)
+
+	event_label.hide()
+
+	ui_root.add_child(event_label)
+
 	firewall_label = Label.new()
+	_style_italic(firewall_label)
 
 	firewall_label.text = (
 		"FIREWALL: ESTABLE"
@@ -2512,6 +3178,7 @@ func _build_menu() -> void:
 	center.add_child(box)
 
 	var title := Label.new()
+	_style_title(title)
 
 	title.text = "PACKET RUNNER 3D"
 
@@ -2532,6 +3199,7 @@ func _build_menu() -> void:
 	box.add_child(title)
 
 	var subtitle := Label.new()
+	_style_italic(subtitle)
 
 	subtitle.text = (
 		"A RHYNUS PROJECT // "
@@ -2575,6 +3243,7 @@ func _build_menu() -> void:
 	box.add_child(info)
 
 	var footer := Label.new()
+	_style_telemetry(footer)
 
 	footer.text = (
 		"← → CAMBIAR CARRIL   "
@@ -2632,6 +3301,7 @@ func _build_info() -> void:
 	center.add_child(box)
 
 	var title := Label.new()
+	_style_title(title)
 
 	title.text = (
 		"PROTOCOLO PACKET RUNNER"
@@ -2725,6 +3395,7 @@ func _build_game_over() -> void:
 	center.add_child(box)
 
 	var title := Label.new()
+	_style_title(title)
 
 	title.text = (
 		"⚠ FIREWALL COMPROMETIDO"
@@ -2747,6 +3418,7 @@ func _build_game_over() -> void:
 	box.add_child(title)
 
 	game_over_score = Label.new()
+	_style_telemetry(game_over_score)
 
 	game_over_score.horizontal_alignment = (
 		HORIZONTAL_ALIGNMENT_CENTER
@@ -2781,6 +3453,9 @@ func _make_button(
 	text_value: String
 ) -> Button:
 	var button := Button.new()
+
+	_style_button(button)
+	animated_buttons.append(button)
 
 	button.text = text_value
 
@@ -2836,6 +3511,128 @@ func _make_button(
 	)
 
 	return button
+
+
+func _show_event_feedback(
+	text_value: String,
+	color: Color,
+	duration: float = 1.25
+) -> void:
+	event_label.text = text_value
+
+	event_label.add_theme_color_override(
+		"font_color",
+		color
+	)
+
+	event_remaining = duration
+
+	event_label.modulate = Color(
+		1.0,
+		1.0,
+		1.0,
+		0.0
+	)
+
+	event_label.scale = Vector2(
+		0.86,
+		0.86
+	)
+
+	event_label.show()
+
+	if is_instance_valid(event_tween):
+		event_tween.kill()
+
+	event_tween = create_tween()
+
+	event_tween.set_parallel(true)
+
+	# Golpe inicial de escala.
+	event_tween.tween_property(
+		event_label,
+		"scale",
+		Vector2.ONE,
+		0.16
+	).set_trans(
+		Tween.TRANS_BACK
+	).set_ease(
+		Tween.EASE_OUT
+	)
+
+	# Entrada luminosa.
+	event_tween.tween_property(
+		event_label,
+		"modulate:a",
+		1.0,
+		0.10
+	).set_trans(
+		Tween.TRANS_QUAD
+	).set_ease(
+		Tween.EASE_OUT
+	)
+
+	# Después hacemos dos flashes cortos.
+	var flash := create_tween()
+
+	flash.tween_interval(0.18)
+
+	flash.tween_property(
+		event_label,
+		"modulate:a",
+		0.42,
+		0.07
+	)
+
+	flash.tween_property(
+		event_label,
+		"modulate:a",
+		1.0,
+		0.07
+	)
+
+	flash.tween_property(
+		event_label,
+		"modulate:a",
+		0.50,
+		0.07
+	)
+
+	flash.tween_property(
+		event_label,
+		"modulate:a",
+		1.0,
+		0.08
+	)
+
+
+func _update_event_feedback(
+	delta: float
+) -> void:
+	if event_remaining <= 0.0:
+		return
+
+	event_remaining -= delta
+
+	if event_remaining <= 0.0:
+		event_remaining = 0.0
+
+		var fade_out := create_tween()
+
+		fade_out.tween_property(
+			event_label,
+			"modulate:a",
+			0.0,
+			0.18
+		).set_trans(
+			Tween.TRANS_QUAD
+		).set_ease(
+			Tween.EASE_IN
+		)
+
+		fade_out.tween_callback(
+			event_label.hide
+		)
 
 
 func _update_hud() -> void:

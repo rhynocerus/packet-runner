@@ -30,6 +30,8 @@ var leg_r: Node3D
 var running: bool = false
 var run_cycle: float = 0.0
 
+var celebrate_remaining: float = 0.0
+
 const RUN_CYCLE_SPEED := 8.2
 
 
@@ -40,10 +42,24 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	elapsed += delta
 
+	celebrate_remaining = maxf(
+		0.0,
+		celebrate_remaining - delta
+	)
+
 	if running:
 		_process_running(delta)
 	else:
 		_process_idle()
+
+
+func celebrate(
+	duration: float = 1.2
+) -> void:
+	celebrate_remaining = maxf(
+		celebrate_remaining,
+		duration
+	)
 
 
 func set_running(value: bool) -> void:
@@ -134,6 +150,58 @@ func _process_running(delta: float) -> void:
 		leg_r.rotation.x = deg_to_rad(
 			stride * 29.0
 		)
+
+	# Al alcanzar un hito, el Rino levanta
+	# los brazos durante un instante.
+	var arm_blend: float = clampf(
+		delta * 9.0,
+		0.0,
+		1.0
+	)
+
+	if celebrate_remaining > 0.0:
+		var cheer: float = sin(
+			elapsed * 13.0
+		)
+
+		if is_instance_valid(arm_l):
+			arm_l.rotation.z = lerp_angle(
+				arm_l.rotation.z,
+				deg_to_rad(-58.0),
+				arm_blend
+			)
+
+			arm_l.rotation.x = deg_to_rad(
+				-18.0
+				+ cheer * 12.0
+			)
+
+		if is_instance_valid(arm_r):
+			arm_r.rotation.z = lerp_angle(
+				arm_r.rotation.z,
+				deg_to_rad(58.0),
+				arm_blend
+			)
+
+			arm_r.rotation.x = deg_to_rad(
+				-18.0
+				- cheer * 12.0
+			)
+
+	else:
+		if is_instance_valid(arm_l):
+			arm_l.rotation.z = lerp_angle(
+				arm_l.rotation.z,
+				0.0,
+				arm_blend
+			)
+
+		if is_instance_valid(arm_r):
+			arm_r.rotation.z = lerp_angle(
+				arm_r.rotation.z,
+				0.0,
+				arm_blend
+			)
 
 
 func _animate_limb(
