@@ -1,7 +1,7 @@
 extends Node3D
 
 # Packet Runner 3D
-# Vertical Slice v0.2 // Living Cyber-Savanna
+# Vertical Slice v0.4 // Levels + Boost + Rich Terrain
 #
 # Primer prototipo jugable:
 # - Cyber-Savanna procedural
@@ -19,6 +19,19 @@ const RHINO_SCENE: PackedScene = preload(
 
 const MUSIC_LEVEL1: AudioStream = preload(
 	"res://assets/audio/music/packet-runner-level1.ogg"
+)
+
+
+const MUSIC_LEVEL2: AudioStream = preload(
+	"res://assets/audio/music/packet-runner-level2.ogg"
+)
+
+const MUSIC_LEVEL3: AudioStream = preload(
+	"res://assets/audio/music/packet-runner-level3.ogg"
+)
+
+const RHYNUS_SPLASH: Texture2D = preload(
+	"res://assets/branding/rhynus/rhynus-splash-web.png"
 )
 
 const SFX_PACKET: AudioStream = preload(
@@ -50,7 +63,7 @@ const DECOR_SPEED := 2.7
 const PLAYER_Z := 2.1
 const LANE_CHANGE_SPEED := 6.5
 
-const FORWARD_MOVE_SPEED := 4.2
+const FORWARD_MOVE_SPEED := 5.8
 const PLAYER_MIN_Z := -3.2
 const PLAYER_MAX_Z := 3.2
 
@@ -58,6 +71,12 @@ const PLAYER_TURN_ANGLE := 12.0
 const PLAYER_TURN_SPEED := 7.0
 
 const CAMERA_FOLLOW_SPEED := 2.6
+
+const BOOST_DURATION := 5.0
+const BOOST_MULTIPLIER := 1.55
+
+const LEVEL_2_SCORE := 300
+const LEVEL_3_SCORE := 700
 
 const SPAWN_INTERVAL := 1.05
 
@@ -83,6 +102,7 @@ var forward_input: float = 0.0
 var lane_markers: Array[MeshInstance3D] = []
 var decorations: Array[Node3D] = []
 var ground_details: Array[Node3D] = []
+var road_details: Array[Node3D] = []
 var pickups: Array[Node3D] = []
 
 var music_player: AudioStreamPlayer
@@ -95,6 +115,9 @@ var status_elapsed: float = 0.0
 
 var score: int = 0
 var shield: int = 100
+
+var current_level: int = 1
+var boost_remaining: float = 0.0
 
 var rng := RandomNumberGenerator.new()
 
@@ -110,6 +133,9 @@ var level_label: Label
 var firewall_label: Label
 var shield_label: Label
 var shield_bar: ProgressBar
+var boost_label: Label
+
+var brand_overlay: ColorRect
 
 var pause_button: Button
 var game_over_score: Label
@@ -122,6 +148,12 @@ func _ready() -> void:
 	_build_player()
 	_build_audio()
 	_build_ui()
+
+	_show_brand_splash()
+
+	await get_tree().create_timer(
+		2.8
+	).timeout
 
 	_show_menu()
 
@@ -137,12 +169,16 @@ func _process(delta: float) -> void:
 	if game_state != GameState.PLAYING:
 		return
 
+	_update_boost(delta)
+	_update_level_progression()
+
 	_handle_player_input()
 	_update_player(delta)
 	_update_camera(delta)
 
 	_update_track(delta)
 	_update_ground_details(delta)
+	_update_road_details(delta)
 	_update_decorations(delta)
 
 	_update_pickups(delta)
@@ -157,6 +193,10 @@ func _process(delta: float) -> void:
 func _start_game() -> void:
 	score = 0
 	shield = 100
+
+	current_level = 1
+	boost_remaining = 0.0
+
 	target_lane = 1
 	spawn_elapsed = 0.0
 
@@ -204,6 +244,9 @@ func _start_game() -> void:
 
 func _show_menu() -> void:
 	game_state = GameState.MENU
+
+	if is_instance_valid(brand_overlay):
+		brand_overlay.hide()
 
 	if is_instance_valid(music_player):
 		music_player.stop()
@@ -389,6 +432,7 @@ func _update_player(delta: float) -> void:
 		player.position.z
 		+ forward_input
 		* FORWARD_MOVE_SPEED
+		* _boost_multiplier()
 		* delta,
 		PLAYER_MIN_Z,
 		PLAYER_MAX_Z
@@ -443,6 +487,51 @@ func _update_camera(delta: float) -> void:
 	)
 
 
+func _boost_multiplier() -> float:
+	if boost_remaining > 0.0:
+		return BOOST_MULTIPLIER
+
+	return 1.0
+
+
+func _level_speed_multiplier() -> float:
+	match current_level:
+		2:
+			return 1.10
+
+		3:
+			return 1.22
+
+	return 1.0
+
+
+func _current_track_speed() -> float:
+	return (
+		TRACK_SPEED
+		* _boost_multiplier()
+		* _level_speed_multiplier()
+	)
+
+
+func _current_decor_speed() -> float:
+	return (
+		DECOR_SPEED
+		* _boost_multiplier()
+		* _level_speed_multiplier()
+	)
+
+
+func _current_spawn_interval() -> float:
+	match current_level:
+		2:
+			return 0.90
+
+		3:
+			return 0.78
+
+	return SPAWN_INTERVAL
+
+
 func _lane_x(lane: int) -> float:
 	match lane:
 		0:
@@ -463,6 +552,7 @@ func _build_world() -> void:
 	_build_environment()
 	_build_ground()
 	_build_ground_details()
+	_build_road_details()
 	_build_track()
 	_build_edge_guides()
 	_build_horizon()
@@ -585,7 +675,7 @@ func _build_ground() -> void:
 
 
 func _build_ground_details() -> void:
-	for i in range(46):
+	for i in range(58):
 		var side: float = (
 			-1.0
 			if i % 2 == 0
@@ -609,20 +699,26 @@ func _build_ground_details() -> void:
 
 		var detail: Node3D
 
-		if roll < 0.45:
+		if roll < 0.36:
 			detail = _create_ground_patch(
 				x,
 				z
 			)
 
-		elif roll < 0.73:
+		elif roll < 0.58:
 			detail = _create_rock(
 				x,
 				z
 			)
 
-		else:
+		elif roll < 0.80:
 			detail = _create_data_grass(
+				x,
+				z
+			)
+
+		else:
+			detail = _create_data_trace(
 				x,
 				z
 			)
@@ -814,12 +910,81 @@ func _create_data_grass(
 	return root
 
 
+func _create_data_trace(
+	x: float,
+	z: float
+) -> Node3D:
+	var root := Node3D.new()
+
+	root.position = Vector3(
+		x,
+		0.018,
+		z
+	)
+
+	add_child(root)
+
+	var energy := _make_material(
+		Color(
+			0.0,
+			0.20,
+			0.22,
+			1.0
+		),
+		Color(
+			0.0,
+			0.32,
+			0.36,
+			1.0
+		)
+	)
+
+	var segment_count := rng.randi_range(
+		2,
+		4
+	)
+
+	for i in range(segment_count):
+		var line := MeshInstance3D.new()
+		var mesh := BoxMesh.new()
+
+		mesh.size = Vector3(
+			rng.randf_range(
+				0.18,
+				0.55
+			),
+			0.014,
+			0.025
+		)
+
+		line.mesh = mesh
+
+		line.position = Vector3(
+			float(i) * 0.26,
+			0.0,
+			float(i % 2) * 0.12
+		)
+
+		line.rotation.y = deg_to_rad(
+			rng.randf_range(
+				-18.0,
+				18.0
+			)
+		)
+
+		line.material_override = energy
+
+		root.add_child(line)
+
+	return root
+
+
 func _update_ground_details(
 	delta: float
 ) -> void:
 	for item in ground_details:
 		item.position.z += (
-			TRACK_SPEED * delta
+			_current_track_speed() * delta
 		)
 
 		if item.position.z > 8.0:
@@ -837,6 +1002,104 @@ func _update_ground_details(
 					3.4,
 					12.0
 				)
+			)
+
+
+func _build_road_details() -> void:
+	var panel_dark := _make_material(
+		Color(
+			0.025,
+			0.050,
+			0.060,
+			1.0
+		),
+		Color.BLACK
+	)
+
+	var panel_data := _make_material(
+		Color(
+			0.02,
+			0.12,
+			0.14,
+			1.0
+		),
+		Color(
+			0.0,
+			0.22,
+			0.25,
+			1.0
+		)
+	)
+
+	for i in range(28):
+		var root := Node3D.new()
+
+		root.position = Vector3(
+			rng.randf_range(
+				-2.55,
+				2.55
+			),
+			0.014,
+			4.0
+			- float(i) * 1.75
+			+ rng.randf_range(
+				-0.35,
+				0.35
+			)
+		)
+
+		add_child(root)
+
+		var plate := MeshInstance3D.new()
+		var mesh := BoxMesh.new()
+
+		mesh.size = Vector3(
+			rng.randf_range(
+				0.35,
+				1.15
+			),
+			0.016,
+			rng.randf_range(
+				0.18,
+				0.60
+			)
+		)
+
+		plate.mesh = mesh
+
+		plate.rotation.y = rng.randf_range(
+			-0.10,
+			0.10
+		)
+
+		if rng.randf() < 0.22:
+			plate.material_override = panel_data
+		else:
+			plate.material_override = panel_dark
+
+		root.add_child(plate)
+
+		road_details.append(root)
+
+
+func _update_road_details(delta: float) -> void:
+	for item in road_details:
+		item.position.z += (
+			_current_track_speed()
+			* delta
+		)
+
+		if item.position.z > 7.0:
+			item.position.z -= 50.0
+
+			item.position.x = rng.randf_range(
+				-2.55,
+				2.55
+			)
+
+			item.rotation.y = rng.randf_range(
+				-0.12,
+				0.12
 			)
 
 
@@ -903,7 +1166,7 @@ func _build_edge_guides() -> void:
 func _update_track(delta: float) -> void:
 	for marker in lane_markers:
 		marker.position.z += (
-			TRACK_SPEED * delta
+			_current_track_speed() * delta
 		)
 
 		if marker.position.z > 5.0:
@@ -1486,7 +1749,7 @@ func _create_data_beacon(
 func _update_decorations(delta: float) -> void:
 	for item in decorations:
 		item.position.z += (
-			DECOR_SPEED * delta
+			_current_decor_speed() * delta
 		)
 
 		if item.position.z > 8.0:
@@ -1536,7 +1799,7 @@ func _update_decorations(delta: float) -> void:
 func _update_spawning(delta: float) -> void:
 	spawn_elapsed += delta
 
-	if spawn_elapsed < SPAWN_INTERVAL:
+	if spawn_elapsed < _current_spawn_interval():
 		return
 
 	spawn_elapsed = 0.0
@@ -1564,11 +1827,40 @@ func _spawn_pickup() -> void:
 	var roll: float = rng.randf()
 	var kind: String = "packet"
 
-	if roll < 0.60:
+	var malware_chance: float = 0.14
+
+	match current_level:
+		2:
+			malware_chance = 0.20
+
+		3:
+			malware_chance = 0.26
+
+	var shield_chance := 0.18
+	var boost_chance := 0.10
+
+	var packet_chance: float = (
+		1.0
+		- malware_chance
+		- shield_chance
+		- boost_chance
+	)
+
+	if roll < packet_chance:
 		kind = "packet"
 
-	elif roll < 0.80:
+	elif roll < (
+		packet_chance
+		+ shield_chance
+	):
 		kind = "shield"
+
+	elif roll < (
+		packet_chance
+		+ shield_chance
+		+ boost_chance
+	):
+		kind = "boost"
 
 	else:
 		kind = "malware"
@@ -1638,6 +1930,32 @@ func _build_pickup_visual(
 			45.0
 		)
 
+	elif kind == "boost":
+		var boost_mesh := CylinderMesh.new()
+
+		boost_mesh.top_radius = 0.12
+		boost_mesh.bottom_radius = 0.24
+		boost_mesh.height = 0.68
+		boost_mesh.radial_segments = 6
+
+		mesh_resource = boost_mesh
+
+		material = _make_material(
+			Color(
+				0.68,
+				0.44,
+				0.04,
+				1.0
+			),
+			YELLOW
+		)
+
+		visual.rotation_degrees = Vector3(
+			90.0,
+			0.0,
+			0.0
+		)
+
 	else:
 		var malware_mesh := SphereMesh.new()
 
@@ -1703,7 +2021,7 @@ func _update_pickups(delta: float) -> void:
 		var item: Node3D = pickups[i]
 
 		item.position.z += (
-			TRACK_SPEED * delta
+			_current_track_speed() * delta
 		)
 
 		item.rotation.y += (
@@ -1775,6 +2093,16 @@ func _collect_pickup(
 				1.5
 			)
 
+		"boost":
+			boost_remaining = BOOST_DURATION
+
+			_play_safe_sfx(1.38)
+
+			_set_status(
+				"⚡ BOOST DE RED // 5 SEG",
+				1.8
+			)
+
 		"malware":
 			sfx_malware.pitch_scale = 1.0
 			sfx_malware.play()
@@ -1796,6 +2124,94 @@ func _collect_pickup(
 				return
 
 	_update_hud()
+
+
+func _update_boost(delta: float) -> void:
+	if boost_remaining <= 0.0:
+		boost_remaining = 0.0
+		return
+
+	boost_remaining = maxf(
+		0.0,
+		boost_remaining - delta
+	)
+
+	_update_hud()
+
+
+func _update_level_progression() -> void:
+	var target_level := 1
+
+	if score >= LEVEL_3_SCORE:
+		target_level = 3
+
+	elif score >= LEVEL_2_SCORE:
+		target_level = 2
+
+	if target_level == current_level:
+		return
+
+	current_level = target_level
+
+	_apply_level_change()
+
+
+func _apply_level_change() -> void:
+	var next_music: AudioStream = MUSIC_LEVEL1
+
+	match current_level:
+		1:
+			level_label.text = (
+				"NIVEL 01 // SABANA CONECTADA"
+			)
+
+			level_label.add_theme_color_override(
+				"font_color",
+				GREEN
+			)
+
+			next_music = MUSIC_LEVEL1
+
+		2:
+			level_label.text = (
+				"NIVEL 02 // FRENTE DE INFECCIÓN"
+			)
+
+			level_label.add_theme_color_override(
+				"font_color",
+				YELLOW
+			)
+
+			next_music = MUSIC_LEVEL2
+
+			_set_status(
+				"⚠ ACTIVIDAD HOSTIL EN AUMENTO",
+				2.5
+			)
+
+		3:
+			level_label.text = (
+				"NIVEL 03 // REDLINE SAVANNA"
+			)
+
+			level_label.add_theme_color_override(
+				"font_color",
+				RED
+			)
+
+			next_music = MUSIC_LEVEL3
+
+			_set_status(
+				"⚠ RED EN ESTADO CRÍTICO",
+				2.5
+			)
+
+	if (
+		is_instance_valid(music_player)
+		and music_player.stream != next_music
+	):
+		music_player.stream = next_music
+		music_player.play()
 
 
 func _clear_pickups() -> void:
@@ -1824,10 +2240,99 @@ func _build_ui() -> void:
 
 	canvas.add_child(ui_root)
 
+	_build_brand_splash()
 	_build_hud()
 	_build_menu()
 	_build_info()
 	_build_game_over()
+
+
+func _build_brand_splash() -> void:
+	brand_overlay = ColorRect.new()
+
+	brand_overlay.color = Color(
+		0.005,
+		0.015,
+		0.025,
+		1.0
+	)
+
+	brand_overlay.set_anchors_and_offsets_preset(
+		Control.PRESET_FULL_RECT
+	)
+
+	ui_root.add_child(brand_overlay)
+
+	var center := CenterContainer.new()
+
+	center.set_anchors_and_offsets_preset(
+		Control.PRESET_FULL_RECT
+	)
+
+	brand_overlay.add_child(center)
+
+	var box := VBoxContainer.new()
+
+	box.custom_minimum_size = Vector2(
+		600.0,
+		360.0
+	)
+
+	box.alignment = (
+		BoxContainer.ALIGNMENT_CENTER
+	)
+
+	center.add_child(box)
+
+	var logo := TextureRect.new()
+
+	logo.texture = RHYNUS_SPLASH
+
+	logo.custom_minimum_size = Vector2(
+		560.0,
+		250.0
+	)
+
+	logo.stretch_mode = (
+		TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	)
+
+	box.add_child(logo)
+
+	var label := Label.new()
+
+	label.text = (
+		"RHYNUS INTERACTIVE WORKS"
+	)
+
+	label.horizontal_alignment = (
+		HORIZONTAL_ALIGNMENT_CENTER
+	)
+
+	label.add_theme_color_override(
+		"font_color",
+		CYAN
+	)
+
+	label.add_theme_font_size_override(
+		"font_size",
+		18
+	)
+
+	box.add_child(label)
+
+	brand_overlay.hide()
+
+
+func _show_brand_splash() -> void:
+	menu_overlay.hide()
+	info_overlay.hide()
+	game_over_overlay.hide()
+
+	hud.hide()
+	pause_button.hide()
+
+	brand_overlay.show()
 
 
 func _build_hud() -> void:
@@ -1916,6 +2421,15 @@ func _build_hud() -> void:
 	)
 
 	hud.add_child(shield_bar)
+
+	boost_label = Label.new()
+
+	boost_label.add_theme_color_override(
+		"font_color",
+		YELLOW
+	)
+
+	hud.add_child(boost_label)
 
 	firewall_label = Label.new()
 
@@ -2145,6 +2659,7 @@ func _build_info() -> void:
 		"Defiende la Cyber-Savanna.\n\n"
 		+ "VERDE  // paquete legítimo // +10 puntos\n"
 		+ "CYAN   // escudo de red // +20 firewall\n"
+		+ "AMARILLO // boost de red // velocidad temporal\n"
 		+ "ROJO   // malware // -25 firewall\n\n"
 		+ "← → cambia de carril.\n"
 		+ "ESC o PAUSA detiene el sistema.\n\n"
@@ -2335,6 +2850,16 @@ func _update_hud() -> void:
 	)
 
 	shield_bar.value = shield
+
+	if boost_remaining > 0.0:
+		boost_label.text = (
+			"BOOST      %.1f s"
+			% boost_remaining
+		)
+	else:
+		boost_label.text = (
+			"BOOST      DISPONIBLE EN RUTA"
+		)
 
 
 func _set_status(
