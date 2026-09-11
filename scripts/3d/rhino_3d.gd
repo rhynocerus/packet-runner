@@ -32,6 +32,8 @@ var run_cycle: float = 0.0
 
 var celebrate_remaining: float = 0.0
 
+var hero_pose_active: bool = false
+
 const RUN_CYCLE_SPEED := 8.2
 
 
@@ -51,6 +53,121 @@ func _process(delta: float) -> void:
 		_process_running(delta)
 	else:
 		_process_idle()
+
+	if hero_pose_active:
+		_process_hero_pose(delta)
+
+
+func set_hero_pose(
+	value: bool
+) -> void:
+	hero_pose_active = value
+
+	if not is_instance_valid(head_pivot):
+		return
+
+	var mouth_line: Node3D = (
+		head_pivot.get_node_or_null(
+			"MouthLine"
+		) as Node3D
+	)
+
+	var smile_l: Node3D = (
+		head_pivot.get_node_or_null(
+			"SmileL"
+		) as Node3D
+	)
+
+	var smile_r: Node3D = (
+		head_pivot.get_node_or_null(
+			"SmileR"
+		) as Node3D
+	)
+
+	var thumb_r: Node3D = null
+
+	if is_instance_valid(arm_r):
+		thumb_r = (
+			arm_r.get_node_or_null(
+				"Thumb"
+			) as Node3D
+		)
+
+	if is_instance_valid(mouth_line):
+		mouth_line.visible = not value
+
+	if is_instance_valid(smile_l):
+		smile_l.visible = value
+
+	if is_instance_valid(smile_r):
+		smile_r.visible = value
+
+	if is_instance_valid(thumb_r):
+		thumb_r.visible = value
+
+
+func _process_hero_pose(
+	delta: float
+) -> void:
+	var blend: float = clampf(
+		delta * 7.0,
+		0.0,
+		1.0
+	)
+
+	# Cara mirando ligeramente hacia cámara.
+	if is_instance_valid(head_pivot):
+		head_pivot.rotation.x = lerp_angle(
+			head_pivot.rotation.x,
+			deg_to_rad(-7.0),
+			blend
+		)
+
+		head_pivot.rotation.y = lerp_angle(
+			head_pivot.rotation.y,
+			deg_to_rad(-4.0),
+			blend
+		)
+
+		head_pivot.rotation.z = lerp_angle(
+			head_pivot.rotation.z,
+			deg_to_rad(2.5),
+			blend
+		)
+
+	# Brazo izquierdo relajado y abierto.
+	if is_instance_valid(arm_l):
+		arm_l.rotation.x = lerp_angle(
+			arm_l.rotation.x,
+			deg_to_rad(-10.0),
+			blend
+		)
+
+		arm_l.rotation.z = lerp_angle(
+			arm_l.rotation.z,
+			deg_to_rad(-22.0),
+			blend
+		)
+
+	# Brazo derecho elevado para thumbs-up.
+	if is_instance_valid(arm_r):
+		arm_r.rotation.x = lerp_angle(
+			arm_r.rotation.x,
+			deg_to_rad(-30.0),
+			blend
+		)
+
+		arm_r.rotation.y = lerp_angle(
+			arm_r.rotation.y,
+			deg_to_rad(-12.0),
+			blend
+		)
+
+		arm_r.rotation.z = lerp_angle(
+			arm_r.rotation.z,
+			deg_to_rad(72.0),
+			blend
+		)
 
 
 func celebrate(
@@ -732,6 +849,29 @@ func _build_model() -> void:
 	)
 
 
+	# Comisuras para la pose heroica.
+	var smile_l := _add_box(
+		head_pivot,
+		"SmileL",
+		Vector3(0.115, 0.014, 0.035),
+		armor_dark,
+		Vector3(-0.055, -0.158, 0.815),
+		Vector3(0.0, 0.0, -19.0)
+	)
+
+	var smile_r := _add_box(
+		head_pivot,
+		"SmileR",
+		Vector3(0.115, 0.014, 0.035),
+		armor_dark,
+		Vector3(0.055, -0.158, 0.815),
+		Vector3(0.0, 0.0, 19.0)
+	)
+
+	smile_l.visible = false
+	smile_r.visible = false
+
+
 	# =========================================================
 	# CUERNOS
 	# =========================================================
@@ -1121,6 +1261,26 @@ func _build_arm(
 		Vector3(90.0, 0.0, 0.0),
 		Vector3(1.05, 1.0, 0.88)
 	)
+
+	if side > 0.0:
+		var thumb := _add_part(
+			pivot,
+			"Thumb",
+			_capsule(0.035, 0.155),
+			skin,
+			Vector3(
+				0.095,
+				-0.895,
+				0.115
+			),
+			Vector3(
+				0.0,
+				0.0,
+				-38.0
+			)
+		)
+
+		thumb.visible = false
 
 	_add_box(
 		pivot,

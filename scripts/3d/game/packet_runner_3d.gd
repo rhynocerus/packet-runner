@@ -1,7 +1,7 @@
 extends Node3D
 
 # Packet Runner 3D
-# Vertical Slice v0.6.1 // Cyber UI Motion Polish
+# Vertical Slice v0.7.1 // Cinematic Director Pass
 #
 # Primer prototipo jugable:
 # - Cyber-Savanna procedural
@@ -91,6 +91,8 @@ const BOOST_MULTIPLIER := 1.55
 const LEVEL_2_SCORE := 300
 const LEVEL_3_SCORE := 700
 
+const CINEMATIC_DURATION := 17.0
+
 const SPAWN_INTERVAL := 1.05
 
 const PACKET_SCORE := 10
@@ -99,6 +101,7 @@ const MALWARE_DAMAGE := 25
 
 enum GameState {
 	MENU,
+	INTRO,
 	PLAYING,
 	PAUSED,
 	GAME_OVER
@@ -163,6 +166,17 @@ var event_label: Label
 
 var brand_overlay: ColorRect
 
+var cinematic_overlay: Control
+var cinematic_title: Label
+var cinematic_subtitle: Label
+var cinematic_campaign: Label
+var cinematic_skip_button: Button
+var cinematic_demo_item: Node3D
+
+var cinematic_elapsed: float = 0.0
+var cinematic_phase: int = -1
+var cinematic_text_tween: Tween
+
 var scan_line: ColorRect
 
 var animated_titles: Array[Label] = []
@@ -190,11 +204,26 @@ func _ready() -> void:
 		2.8
 	).timeout
 
-	_show_menu()
+	_start_cinematic_intro()
 
 
 func _process(delta: float) -> void:
 	_update_ui_motion(delta)
+
+	if game_state == GameState.INTRO:
+		if (
+			Input.is_action_just_pressed(
+				"ui_cancel"
+			)
+			or Input.is_action_just_pressed(
+				"ui_accept"
+			)
+		):
+			_finish_cinematic_intro()
+			return
+
+		_update_cinematic_intro(delta)
+		return
 
 	if Input.is_action_just_pressed("ui_cancel"):
 		if (
@@ -285,6 +314,11 @@ func _start_game() -> void:
 
 func _show_menu() -> void:
 	game_state = GameState.MENU
+
+	if is_instance_valid(
+		cinematic_overlay
+	):
+		cinematic_overlay.hide()
 
 	if is_instance_valid(brand_overlay):
 		brand_overlay.hide()
@@ -2629,6 +2663,7 @@ func _build_ui() -> void:
 	ui_root.theme = ui_theme
 
 	_build_brand_splash()
+	_build_cinematic_overlay()
 	_build_hud()
 	_build_menu()
 	_build_info()
@@ -2950,7 +2985,1177 @@ func _show_brand_splash() -> void:
 	hud.hide()
 	pause_button.hide()
 
+	if is_instance_valid(
+		cinematic_overlay
+	):
+		cinematic_overlay.hide()
+
 	brand_overlay.show()
+
+
+# ============================================================
+# CINEMATIC INTRO
+# ============================================================
+
+func _build_cinematic_overlay() -> void:
+	cinematic_overlay = Control.new()
+
+	cinematic_overlay.name = (
+		"CinematicIntro"
+	)
+
+	cinematic_overlay.set_anchors_and_offsets_preset(
+		Control.PRESET_FULL_RECT
+	)
+
+	ui_root.add_child(
+		cinematic_overlay
+	)
+
+	# Letterbox superior.
+	var top_bar := ColorRect.new()
+
+	top_bar.color = Color(
+		0.0,
+		0.005,
+		0.012,
+		0.88
+	)
+
+	top_bar.set_anchors_preset(
+		Control.PRESET_TOP_WIDE
+	)
+
+	top_bar.offset_bottom = 72.0
+
+	cinematic_overlay.add_child(
+		top_bar
+	)
+
+	# Letterbox inferior.
+	var bottom_bar := ColorRect.new()
+
+	bottom_bar.color = Color(
+		0.0,
+		0.005,
+		0.012,
+		0.88
+	)
+
+	bottom_bar.set_anchors_preset(
+		Control.PRESET_BOTTOM_WIDE
+	)
+
+	bottom_bar.offset_top = -88.0
+
+	cinematic_overlay.add_child(
+		bottom_bar
+	)
+
+	# Título cinematográfico.
+	cinematic_title = Label.new()
+
+	_style_title(
+		cinematic_title
+	)
+
+	cinematic_title.horizontal_alignment = (
+		HORIZONTAL_ALIGNMENT_CENTER
+	)
+
+	cinematic_title.set_anchors_preset(
+		Control.PRESET_CENTER_TOP
+	)
+
+	cinematic_title.offset_left = -420.0
+	cinematic_title.offset_top = 88.0
+	cinematic_title.offset_right = 420.0
+	cinematic_title.offset_bottom = 136.0
+
+	cinematic_title.add_theme_font_size_override(
+		"font_size",
+		31
+	)
+
+	cinematic_title.add_theme_color_override(
+		"font_color",
+		CYAN
+	)
+
+	cinematic_overlay.add_child(
+		cinematic_title
+	)
+
+	# Subtítulo.
+	cinematic_subtitle = Label.new()
+
+	_style_italic(
+		cinematic_subtitle
+	)
+
+	cinematic_subtitle.horizontal_alignment = (
+		HORIZONTAL_ALIGNMENT_CENTER
+	)
+
+	cinematic_subtitle.set_anchors_preset(
+		Control.PRESET_CENTER_TOP
+	)
+
+	cinematic_subtitle.offset_left = -440.0
+	cinematic_subtitle.offset_top = 137.0
+	cinematic_subtitle.offset_right = 440.0
+	cinematic_subtitle.offset_bottom = 172.0
+
+	cinematic_subtitle.add_theme_font_size_override(
+		"font_size",
+		17
+	)
+
+	cinematic_subtitle.add_theme_color_override(
+		"font_color",
+		Color(
+			0.72,
+			0.93,
+			0.96,
+			1.0
+		)
+	)
+
+	cinematic_overlay.add_child(
+		cinematic_subtitle
+	)
+
+	# Campaña / logro.
+	cinematic_campaign = Label.new()
+
+	_style_telemetry(
+		cinematic_campaign
+	)
+
+	cinematic_campaign.set_anchors_preset(
+		Control.PRESET_BOTTOM_LEFT
+	)
+
+	cinematic_campaign.offset_left = 24.0
+	cinematic_campaign.offset_top = -66.0
+	cinematic_campaign.offset_right = 560.0
+	cinematic_campaign.offset_bottom = -24.0
+
+	cinematic_campaign.add_theme_font_size_override(
+		"font_size",
+		15
+	)
+
+	cinematic_campaign.add_theme_color_override(
+		"font_color",
+		GREEN
+	)
+
+	cinematic_overlay.add_child(
+		cinematic_campaign
+	)
+
+	# Botón para saltar.
+	cinematic_skip_button = _make_button(
+		"SALTAR INTRO"
+	)
+
+	cinematic_skip_button.custom_minimum_size = Vector2(
+		170.0,
+		40.0
+	)
+
+	cinematic_skip_button.add_theme_font_size_override(
+		"font_size",
+		15
+	)
+
+	cinematic_skip_button.set_anchors_preset(
+		Control.PRESET_TOP_RIGHT
+	)
+
+	cinematic_skip_button.offset_left = -194.0
+	cinematic_skip_button.offset_top = 16.0
+	cinematic_skip_button.offset_right = -18.0
+	cinematic_skip_button.offset_bottom = 58.0
+
+	cinematic_skip_button.pressed.connect(
+		_finish_cinematic_intro
+	)
+
+	cinematic_overlay.add_child(
+		cinematic_skip_button
+	)
+
+	var hint := Label.new()
+
+	_style_telemetry(
+		hint
+	)
+
+	hint.text = (
+		"ESC / ENTER // SALTAR INTRO"
+	)
+
+	hint.horizontal_alignment = (
+		HORIZONTAL_ALIGNMENT_CENTER
+	)
+
+	hint.set_anchors_preset(
+		Control.PRESET_CENTER_BOTTOM
+	)
+
+	hint.offset_left = -260.0
+	hint.offset_top = -58.0
+	hint.offset_right = 260.0
+	hint.offset_bottom = -24.0
+
+	hint.add_theme_color_override(
+		"font_color",
+		Color(
+			0.50,
+			0.78,
+			0.82,
+			1.0
+		)
+	)
+
+	cinematic_overlay.add_child(
+		hint
+	)
+
+	cinematic_overlay.hide()
+
+
+func _start_cinematic_intro() -> void:
+	game_state = GameState.INTRO
+
+	cinematic_elapsed = 0.0
+	cinematic_phase = -1
+
+	brand_overlay.hide()
+	menu_overlay.hide()
+	info_overlay.hide()
+	game_over_overlay.hide()
+
+	hud.hide()
+	pause_button.hide()
+
+	cinematic_overlay.show()
+
+	player.visible = true
+
+	player.position = Vector3(
+		0.0,
+		0.0,
+		0.45
+	)
+
+	player.rotation = Vector3(
+		0.0,
+		PI,
+		0.0
+	)
+
+	if player.has_method(
+		"set_running"
+	):
+		player.call(
+			"set_running",
+			true
+		)
+
+	current_level = 1
+	boost_remaining = 0.0
+
+	camera.position = Vector3(
+		4.2,
+		2.55,
+		-4.7
+	)
+
+	camera.fov = 58.0
+
+	camera.look_at(
+		player.position
+		+ Vector3(
+			0.0,
+			1.55,
+			0.0
+		),
+		Vector3.UP
+	)
+
+	if is_instance_valid(
+		music_player
+	):
+		music_player.stream = (
+			MUSIC_LEVEL1
+		)
+
+		music_player.volume_db = -9.0
+		music_player.play()
+
+	_set_cinematic_phase(0)
+
+
+func _update_cinematic_intro(
+	delta: float
+) -> void:
+	cinematic_elapsed += delta
+
+	# --------------------------------------------------------
+	# ESCENARIO EN MOVIMIENTO
+	# --------------------------------------------------------
+
+	var world_factor: float = 0.74
+
+	if cinematic_phase == 3:
+		world_factor = 1.08
+
+	_update_track(
+		delta * world_factor
+	)
+
+	_update_ground_details(
+		delta * world_factor
+	)
+
+	_update_road_details(
+		delta * world_factor
+	)
+
+	_update_decorations(
+		delta * world_factor
+	)
+
+	_update_level_visuals(delta)
+
+	# --------------------------------------------------------
+	# ATMOSFERA
+	# Fondo oscuro pero nunca negro plano.
+	# --------------------------------------------------------
+
+	if world_environment != null:
+		var atmosphere_pulse: float = (
+			0.5
+			+ 0.5
+			* sin(
+				cinematic_elapsed * 0.72
+			)
+		)
+
+		var cinematic_bg := Color(
+			0.015,
+			0.055,
+			0.075,
+			1.0
+		)
+
+		match cinematic_phase:
+			0, 1, 2:
+				cinematic_bg = Color(
+					0.012,
+					0.060
+					+ atmosphere_pulse * 0.018,
+					0.082
+					+ atmosphere_pulse * 0.020,
+					1.0
+				)
+
+			3:
+				cinematic_bg = Color(
+					0.095,
+					0.038,
+					0.030,
+					1.0
+				)
+
+			4:
+				cinematic_bg = Color(
+					0.045,
+					0.010,
+					0.032,
+					1.0
+				)
+
+			5:
+				cinematic_bg = Color(
+					0.008,
+					0.055,
+					0.078,
+					1.0
+				)
+
+		world_environment.background_color = (
+			world_environment.background_color.lerp(
+				cinematic_bg,
+				clampf(
+					delta * 2.4,
+					0.0,
+					1.0
+				)
+			)
+		)
+
+	# --------------------------------------------------------
+	# RITMO DE AUDIO SIN NUEVO ASSET
+	# Ligero pulso de mezcla sincronizado con pisadas.
+	# --------------------------------------------------------
+
+	if (
+		is_instance_valid(music_player)
+		and music_player.playing
+	):
+		var step_wave: float = absf(
+			sin(
+				cinematic_elapsed
+				* 8.2
+			)
+		)
+
+		var step_hit: float = pow(
+			step_wave,
+			7.0
+		)
+
+		if cinematic_phase < 5:
+			music_player.volume_db = (
+				-10.2
+				+ step_hit * 2.4
+			)
+
+			music_player.pitch_scale = (
+				1.0
+				+ step_hit * 0.012
+			)
+
+		else:
+			music_player.volume_db = lerpf(
+				music_player.volume_db,
+				-8.5,
+				clampf(
+					delta * 2.0,
+					0.0,
+					1.0
+				)
+			)
+
+			music_player.pitch_scale = lerpf(
+				music_player.pitch_scale,
+				1.0,
+				clampf(
+					delta * 3.0,
+					0.0,
+					1.0
+				)
+			)
+
+	# --------------------------------------------------------
+	# RINO
+	# --------------------------------------------------------
+
+	player.position.x = (
+		sin(
+			cinematic_elapsed * 0.72
+		)
+		* 0.14
+	)
+
+	player.position.z = 0.45
+
+	if cinematic_phase < 5:
+		player.rotation.y = (
+			PI
+			+ sin(
+				cinematic_elapsed * 0.58
+			)
+			* deg_to_rad(4.0)
+		)
+
+	# --------------------------------------------------------
+	# OBJETO DE PREVIEW
+	# --------------------------------------------------------
+
+	if is_instance_valid(
+		cinematic_demo_item
+	):
+		cinematic_demo_item.rotation.y += (
+			delta * 2.4
+		)
+
+		cinematic_demo_item.position.y = (
+			1.22
+			+ sin(
+				cinematic_elapsed * 3.0
+			)
+			* 0.10
+		)
+
+	# --------------------------------------------------------
+	# FASE
+	# --------------------------------------------------------
+
+	var new_phase: int = 0
+
+	if cinematic_elapsed >= 13.4:
+		new_phase = 5
+
+	elif cinematic_elapsed >= 10.3:
+		new_phase = 4
+
+	elif cinematic_elapsed >= 7.5:
+		new_phase = 3
+
+	elif cinematic_elapsed >= 5.0:
+		new_phase = 2
+
+	elif cinematic_elapsed >= 2.5:
+		new_phase = 1
+
+	if new_phase != cinematic_phase:
+		_set_cinematic_phase(
+			new_phase
+		)
+
+	# Progreso independiente dentro del plano.
+	var phase_start: float = 0.0
+	var phase_end: float = 2.5
+
+	match cinematic_phase:
+		0:
+			phase_start = 0.0
+			phase_end = 2.5
+
+		1:
+			phase_start = 2.5
+			phase_end = 5.0
+
+		2:
+			phase_start = 5.0
+			phase_end = 7.5
+
+		3:
+			phase_start = 7.5
+			phase_end = 10.3
+
+		4:
+			phase_start = 10.3
+			phase_end = 13.4
+
+		5:
+			phase_start = 13.4
+			phase_end = CINEMATIC_DURATION
+
+	var phase_t: float = clampf(
+		(
+			cinematic_elapsed
+			- phase_start
+		)
+		/ maxf(
+			0.001,
+			phase_end
+			- phase_start
+		),
+		0.0,
+		1.0
+	)
+
+	# --------------------------------------------------------
+	# CAMARA
+	# --------------------------------------------------------
+
+	var target_camera := Vector3(
+		4.2,
+		2.55,
+		-4.7
+	)
+
+	var target_fov: float = 58.0
+
+	match cinematic_phase:
+		0:
+			# Frontal 3/4 que se aproxima.
+			target_camera = Vector3(
+				lerpf(
+					4.20,
+					2.10,
+					phase_t
+				),
+				lerpf(
+					2.55,
+					2.15,
+					phase_t
+				),
+				lerpf(
+					-4.70,
+					-3.45,
+					phase_t
+				)
+			)
+
+			target_fov = lerpf(
+				58.0,
+				53.0,
+				phase_t
+			)
+
+		1:
+			# Barrido lateral alrededor del Rino.
+			target_camera = Vector3(
+				-4.9
+				+ sin(
+					phase_t * PI
+				)
+				* 1.10,
+				2.12
+				+ sin(
+					phase_t * PI
+				)
+				* 0.28,
+				lerpf(
+					1.20,
+					-1.20,
+					phase_t
+				)
+			)
+
+			target_fov = 61.0
+
+		2:
+			# Persecución trasera que cruza el eje.
+			target_camera = Vector3(
+				lerpf(
+					2.60,
+					-1.55,
+					phase_t
+				),
+				lerpf(
+					3.00,
+					2.45,
+					phase_t
+				),
+				lerpf(
+					5.80,
+					4.55,
+					phase_t
+				)
+			)
+
+			target_fov = lerpf(
+				65.0,
+				70.0,
+				phase_t
+			)
+
+		3:
+			# BOOST: cámara se lanza hacia él.
+			target_camera = Vector3(
+				lerpf(
+					-1.80,
+					0.20,
+					phase_t
+				),
+				lerpf(
+					1.85,
+					1.48,
+					phase_t
+				),
+				lerpf(
+					4.35,
+					2.85,
+					phase_t
+				)
+			)
+
+			target_fov = lerpf(
+				74.0,
+				82.0,
+				phase_t
+			)
+
+		4:
+			# Redline: media órbita frontal.
+			target_camera = Vector3(
+				lerpf(
+					-4.10,
+					2.55,
+					phase_t
+				),
+				2.20
+				+ sin(
+					phase_t * PI
+				)
+				* 0.35,
+				-4.25
+				+ sin(
+					phase_t * PI
+				)
+				* 0.70
+			)
+
+			target_fov = lerpf(
+				62.0,
+				56.0,
+				phase_t
+			)
+
+		5:
+			# Hero shot final:
+			# dolly directo a rostro y pulgar.
+			target_camera = Vector3(
+				lerpf(
+					0.75,
+					0.28,
+					phase_t
+				),
+				lerpf(
+					2.30,
+					1.93,
+					phase_t
+				),
+				lerpf(
+					-5.10,
+					-2.85,
+					phase_t
+				)
+			)
+
+			target_fov = lerpf(
+				55.0,
+				46.0,
+				phase_t
+			)
+
+	var camera_blend: float = clampf(
+		delta * 3.0,
+		0.0,
+		1.0
+	)
+
+	camera.position = camera.position.lerp(
+		target_camera,
+		camera_blend
+	)
+
+	camera.fov = lerpf(
+		camera.fov,
+		target_fov,
+		camera_blend
+	)
+
+	var look_height: float = 1.55
+
+	if cinematic_phase == 5:
+		look_height = 1.72
+
+	camera.look_at(
+		player.position
+		+ Vector3(
+			0.0,
+			look_height,
+			0.0
+		),
+		Vector3.UP
+	)
+
+	if cinematic_elapsed >= CINEMATIC_DURATION:
+		_finish_cinematic_intro()
+
+
+func _set_cinematic_phase(
+	phase: int
+) -> void:
+	cinematic_phase = phase
+
+	if player.has_method(
+		"set_hero_pose"
+	):
+		player.call(
+			"set_hero_pose",
+			phase == 5
+		)
+
+	if player.has_method(
+		"set_running"
+	):
+		player.call(
+			"set_running",
+			phase != 5
+		)
+
+	var demo_kind := ""
+
+	match phase:
+		0:
+			current_level = 1
+			boost_remaining = 0.0
+
+			cinematic_title.text = (
+				"PACKET RUNNER 3D"
+			)
+
+			cinematic_subtitle.text = (
+				"DEFENDER LA RED EMPIEZA "
+				+ "POR LEER EL CAMINO"
+			)
+
+			cinematic_campaign.text = (
+				"CAMPAÑA 01 / 03  //  "
+				+ "SABANA CONECTADA"
+			)
+
+			cinematic_title.add_theme_color_override(
+				"font_color",
+				CYAN
+			)
+
+			_set_cinematic_music(
+				MUSIC_LEVEL1
+			)
+
+		1:
+			demo_kind = "packet"
+
+			cinematic_title.text = (
+				"PAQUETES SEGUROS"
+			)
+
+			cinematic_subtitle.text = (
+				"CAPTURA DATOS LEGITIMOS  //  +10"
+			)
+
+			cinematic_campaign.text = (
+				"LOGRO PREVIEW  //  FLUJO SEGURO"
+			)
+
+			cinematic_title.add_theme_color_override(
+				"font_color",
+				GREEN
+			)
+
+		2:
+			demo_kind = "shield"
+
+			cinematic_title.text = (
+				"ESCUDO DE RED"
+			)
+
+			cinematic_subtitle.text = (
+				"REFUERZA EL FIREWALL  //  +20"
+			)
+
+			cinematic_campaign.text = (
+				"DEFENSA ACTIVA  //  "
+				+ "PROTEGE EL NUCLEO"
+			)
+
+			cinematic_title.add_theme_color_override(
+				"font_color",
+				CYAN
+			)
+
+			if player.has_method(
+				"celebrate"
+			):
+				player.call(
+					"celebrate",
+					0.85
+				)
+
+		3:
+			current_level = 2
+			boost_remaining = 999.0
+			demo_kind = "boost"
+
+			cinematic_title.text = (
+				"BOOST DE RED"
+			)
+
+			cinematic_subtitle.text = (
+				"MAS VELOCIDAD  //  "
+				+ "MENOS TIEMPO PARA REACCIONAR"
+			)
+
+			cinematic_campaign.text = (
+				"CAMPAÑA 02 / 03  //  "
+				+ "FRENTE DE INFECCION"
+			)
+
+			cinematic_title.add_theme_color_override(
+				"font_color",
+				YELLOW
+			)
+
+			_set_cinematic_music(
+				MUSIC_LEVEL2
+			)
+
+		4:
+			current_level = 3
+			boost_remaining = 0.0
+			demo_kind = "malware"
+
+			cinematic_title.text = (
+				"REDLINE SAVANNA"
+			)
+
+			cinematic_subtitle.text = (
+				"MALWARE ACTIVO  //  "
+				+ "FIREWALL EN ESTADO CRITICO"
+			)
+
+			cinematic_campaign.text = (
+				"CAMPAÑA 03 / 03  //  "
+				+ "SOBREVIVE A LA RED"
+			)
+
+			cinematic_title.add_theme_color_override(
+				"font_color",
+				RED
+			)
+
+			_set_cinematic_music(
+				MUSIC_LEVEL3
+			)
+
+			if player.has_method(
+				"celebrate"
+			):
+				player.call(
+					"celebrate",
+					1.15
+				)
+
+		5:
+			# Restauramos la sabana mientras hacemos
+			# el plano heroico final.
+			current_level = 1
+			boost_remaining = 0.0
+
+			cinematic_title.text = (
+				"PACKET RUNNER 3D"
+			)
+
+			cinematic_subtitle.text = (
+				"LISTO PARA CORRER  //  "
+				+ "LA RED TE ESPERA"
+			)
+
+			cinematic_campaign.text = (
+				"MISION LISTA  //  "
+				+ "A RHYNUS PROJECT"
+			)
+
+			cinematic_title.add_theme_color_override(
+				"font_color",
+				CYAN
+			)
+
+			_set_cinematic_music(
+				MUSIC_LEVEL1
+			)
+
+			if player.has_method(
+				"celebrate"
+			):
+				player.call(
+					"celebrate",
+					2.0
+				)
+
+	_set_cinematic_demo(
+		demo_kind
+	)
+
+	# Golpe visual al cambiar de capítulo.
+	if is_instance_valid(
+		cinematic_text_tween
+	):
+		cinematic_text_tween.kill()
+
+	cinematic_subtitle.modulate = Color(
+		1.0,
+		1.0,
+		1.0,
+		0.0
+	)
+
+	cinematic_campaign.modulate = Color(
+		1.0,
+		1.0,
+		1.0,
+		0.0
+	)
+
+	cinematic_title.scale = Vector2(
+		0.94,
+		0.94
+	)
+
+	cinematic_text_tween = create_tween()
+
+	cinematic_text_tween.set_parallel(
+		true
+	)
+
+	cinematic_text_tween.tween_property(
+		cinematic_subtitle,
+		"modulate:a",
+		1.0,
+		0.24
+	)
+
+	cinematic_text_tween.tween_property(
+		cinematic_campaign,
+		"modulate:a",
+		1.0,
+		0.30
+	)
+
+	cinematic_text_tween.tween_property(
+		cinematic_title,
+		"scale",
+		Vector2.ONE,
+		0.28
+	).set_trans(
+		Tween.TRANS_BACK
+	).set_ease(
+		Tween.EASE_OUT
+	)
+
+
+func _set_cinematic_music(
+	stream: AudioStream
+) -> void:
+	if not is_instance_valid(
+		music_player
+	):
+		return
+
+	if music_player.stream == stream:
+		if not music_player.playing:
+			music_player.play()
+
+		return
+
+	music_player.stream = stream
+	music_player.play()
+
+
+func _set_cinematic_demo(
+	kind: String
+) -> void:
+	if is_instance_valid(
+		cinematic_demo_item
+	):
+		cinematic_demo_item.queue_free()
+
+		cinematic_demo_item = null
+
+	if kind.is_empty():
+		return
+
+	cinematic_demo_item = Node3D.new()
+
+	cinematic_demo_item.name = (
+		"CinematicDemoItem"
+	)
+
+	cinematic_demo_item.position = Vector3(
+		1.40,
+		1.22,
+		-1.20
+	)
+
+	cinematic_demo_item.scale = Vector3.ONE * 1.25
+
+	_build_pickup_visual(
+		cinematic_demo_item,
+		kind
+	)
+
+	add_child(
+		cinematic_demo_item
+	)
+
+
+func _finish_cinematic_intro() -> void:
+	if game_state != GameState.INTRO:
+		return
+
+	if is_instance_valid(
+		cinematic_demo_item
+	):
+		cinematic_demo_item.queue_free()
+
+		cinematic_demo_item = null
+
+	cinematic_overlay.hide()
+
+	current_level = 1
+	boost_remaining = 0.0
+
+	# Restauración inmediata de la paleta.
+	_update_level_visuals(
+		10.0
+	)
+
+	player.position = Vector3(
+		0.0,
+		0.0,
+		PLAYER_Z
+	)
+
+	player.rotation = Vector3(
+		0.0,
+		PI,
+		0.0
+	)
+
+	camera.position = Vector3(
+		0.0,
+		3.45,
+		7.20
+	)
+
+	camera.fov = 70.0
+
+	camera.look_at(
+		Vector3(
+			0.0,
+			1.15,
+			-2.0
+		),
+		Vector3.UP
+	)
+
+	if player.has_method(
+		"set_running"
+	):
+		player.call(
+			"set_running",
+			false
+		)
+
+
+	if player.has_method(
+		"set_hero_pose"
+	):
+		player.call(
+			"set_hero_pose",
+			false
+		)
+
+	if is_instance_valid(
+		music_player
+	):
+		music_player.stop()
+
+		music_player.volume_db = -7.0
+		music_player.pitch_scale = 1.0
+
+	_show_menu()
 
 
 func _build_hud() -> void:
@@ -3246,7 +4451,7 @@ func _build_menu() -> void:
 	_style_telemetry(footer)
 
 	footer.text = (
-		"← → CAMBIAR CARRIL   "
+		"IZQ / DER // CAMBIAR CARRIL   "
 		+ "ESC PAUSA"
 	)
 
@@ -3331,7 +4536,7 @@ func _build_info() -> void:
 		+ "CYAN   // escudo de red // +20 firewall\n"
 		+ "AMARILLO // boost de red // velocidad temporal\n"
 		+ "ROJO   // malware // -25 firewall\n\n"
-		+ "← → cambia de carril.\n"
+		+ "IZQ / DER // cambia de carril.\n"
 		+ "ESC o PAUSA detiene el sistema.\n\n"
 		+ "Objetivo experimental:\n"
 		+ "proteger el flujo de datos "
