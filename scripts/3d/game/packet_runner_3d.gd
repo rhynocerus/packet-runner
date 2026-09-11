@@ -1,7 +1,7 @@
 extends Node3D
 
 # Packet Runner 3D
-# Vertical Slice v0.1
+# Vertical Slice v0.2 // Living Cyber-Savanna
 #
 # Primer prototipo jugable:
 # - Cyber-Savanna procedural
@@ -16,6 +16,23 @@ extends Node3D
 const RHINO_SCENE: PackedScene = preload(
 	"res://scenes/3d/rhino/rhino_3d.tscn"
 )
+
+const MUSIC_LEVEL1: AudioStream = preload(
+	"res://assets/audio/music/packet-runner-level1.ogg"
+)
+
+const SFX_PACKET: AudioStream = preload(
+	"res://assets/audio/sfx/packet-safe.wav"
+)
+
+const SFX_MALWARE: AudioStream = preload(
+	"res://assets/audio/sfx/malware-hit.wav"
+)
+
+const SFX_GAME_OVER: AudioStream = preload(
+	"res://assets/audio/sfx/game-over.wav"
+)
+
 
 const CYAN := Color(0.0, 0.90, 1.0, 1.0)
 const GREEN := Color(0.19, 0.97, 0.64, 1.0)
@@ -33,6 +50,15 @@ const DECOR_SPEED := 2.7
 const PLAYER_Z := 2.1
 const LANE_CHANGE_SPEED := 6.5
 
+const FORWARD_MOVE_SPEED := 4.2
+const PLAYER_MIN_Z := -3.2
+const PLAYER_MAX_Z := 3.2
+
+const PLAYER_TURN_ANGLE := 12.0
+const PLAYER_TURN_SPEED := 7.0
+
+const CAMERA_FOLLOW_SPEED := 2.6
+
 const SPAWN_INTERVAL := 1.05
 
 const PACKET_SCORE := 10
@@ -49,11 +75,20 @@ enum GameState {
 var game_state: int = GameState.MENU
 
 var player: Node3D
+var camera: Camera3D
+
 var target_lane: int = 1
+var forward_input: float = 0.0
 
 var lane_markers: Array[MeshInstance3D] = []
 var decorations: Array[Node3D] = []
+var ground_details: Array[Node3D] = []
 var pickups: Array[Node3D] = []
+
+var music_player: AudioStreamPlayer
+var sfx_safe: AudioStreamPlayer
+var sfx_malware: AudioStreamPlayer
+var sfx_game_over: AudioStreamPlayer
 
 var spawn_elapsed: float = 0.0
 var status_elapsed: float = 0.0
@@ -85,6 +120,7 @@ func _ready() -> void:
 
 	_build_world()
 	_build_player()
+	_build_audio()
 	_build_ui()
 
 	_show_menu()
@@ -101,10 +137,14 @@ func _process(delta: float) -> void:
 	if game_state != GameState.PLAYING:
 		return
 
-	_handle_lane_input()
+	_handle_player_input()
 	_update_player(delta)
+	_update_camera(delta)
+
 	_update_track(delta)
+	_update_ground_details(delta)
 	_update_decorations(delta)
+
 	_update_pickups(delta)
 	_update_spawning(delta)
 	_update_status(delta)
@@ -154,11 +194,19 @@ func _start_game() -> void:
 		0.0
 	)
 
+	if not music_player.playing:
+		music_player.play()
+
+	music_player.stream_paused = false
+
 	_update_hud()
 
 
 func _show_menu() -> void:
 	game_state = GameState.MENU
+
+	if is_instance_valid(music_player):
+		music_player.stop()
 
 	menu_overlay.show()
 	info_overlay.hide()
@@ -188,6 +236,9 @@ func _toggle_pause() -> void:
 		game_state = GameState.PAUSED
 		pause_button.text = "CONTINUAR"
 
+		if is_instance_valid(music_player):
+			music_player.stream_paused = true
+
 		if player.has_method("set_running"):
 			player.call("set_running", false)
 
@@ -196,6 +247,9 @@ func _toggle_pause() -> void:
 	elif game_state == GameState.PAUSED:
 		game_state = GameState.PLAYING
 		pause_button.text = "PAUSA"
+
+		if is_instance_valid(music_player):
+			music_player.stream_paused = false
 
 		if player.has_method("set_running"):
 			player.call("set_running", true)
@@ -208,6 +262,12 @@ func _toggle_pause() -> void:
 
 func _game_over() -> void:
 	game_state = GameState.GAME_OVER
+
+	if is_instance_valid(music_player):
+		music_player.stop()
+
+	if is_instance_valid(sfx_game_over):
+		sfx_game_over.play()
 
 	if player.has_method("set_running"):
 		player.call("set_running", false)
@@ -223,6 +283,43 @@ func _game_over() -> void:
 	firewall_label.text = (
 		"⚠ FIREWALL COMPROMETIDO"
 	)
+
+
+# ============================================================
+# AUDIO
+# ============================================================
+
+func _build_audio() -> void:
+	music_player = AudioStreamPlayer.new()
+	music_player.name = "BackgroundMusic3D"
+	music_player.stream = MUSIC_LEVEL1
+	music_player.volume_db = -7.0
+	add_child(music_player)
+
+	sfx_safe = AudioStreamPlayer.new()
+	sfx_safe.name = "SfxSafe3D"
+	sfx_safe.stream = SFX_PACKET
+	sfx_safe.volume_db = -1.0
+	add_child(sfx_safe)
+
+	sfx_malware = AudioStreamPlayer.new()
+	sfx_malware.name = "SfxMalware3D"
+	sfx_malware.stream = SFX_MALWARE
+	sfx_malware.volume_db = -1.0
+	add_child(sfx_malware)
+
+	sfx_game_over = AudioStreamPlayer.new()
+	sfx_game_over.name = "SfxGameOver3D"
+	sfx_game_over.stream = SFX_GAME_OVER
+	sfx_game_over.volume_db = -1.0
+	add_child(sfx_game_over)
+
+
+func _play_safe_sfx(
+	pitch: float = 1.0
+) -> void:
+	sfx_safe.pitch_scale = pitch
+	sfx_safe.play()
 
 
 # ============================================================
@@ -245,7 +342,7 @@ func _build_player() -> void:
 	add_child(player)
 
 
-func _handle_lane_input() -> void:
+func _handle_player_input() -> void:
 	if Input.is_action_just_pressed("ui_left"):
 		target_lane = clampi(
 			target_lane - 1,
@@ -260,14 +357,89 @@ func _handle_lane_input() -> void:
 			2
 		)
 
+	forward_input = 0.0
+
+	if (
+		Input.is_key_pressed(KEY_W)
+		or Input.is_action_pressed("ui_up")
+	):
+		forward_input -= 1.0
+
+	if (
+		Input.is_key_pressed(KEY_S)
+		or Input.is_action_pressed("ui_down")
+	):
+		forward_input += 1.0
+
 
 func _update_player(delta: float) -> void:
 	var target_x: float = _lane_x(target_lane)
+
+	var horizontal_error: float = (
+		target_x - player.position.x
+	)
 
 	player.position.x = move_toward(
 		player.position.x,
 		target_x,
 		LANE_CHANGE_SPEED * delta
+	)
+
+	player.position.z = clampf(
+		player.position.z
+		+ forward_input
+		* FORWARD_MOVE_SPEED
+		* delta,
+		PLAYER_MIN_Z,
+		PLAYER_MAX_Z
+	)
+
+	# El Rino mira ligeramente hacia el carril
+	# al que está desplazándose.
+	var turn_factor: float = clampf(
+		horizontal_error / 1.6,
+		-1.0,
+		1.0
+	)
+
+	var desired_yaw: float = (
+		PI
+		- deg_to_rad(
+			PLAYER_TURN_ANGLE
+			* turn_factor
+		)
+	)
+
+	player.rotation.y = lerp_angle(
+		player.rotation.y,
+		desired_yaw,
+		minf(
+			1.0,
+			PLAYER_TURN_SPEED * delta
+		)
+	)
+
+
+func _update_camera(delta: float) -> void:
+	if not is_instance_valid(camera):
+		return
+
+	camera.position.x = lerpf(
+		camera.position.x,
+		player.position.x * 0.18,
+		minf(
+			1.0,
+			CAMERA_FOLLOW_SPEED * delta
+		)
+	)
+
+	camera.look_at(
+		Vector3(
+			player.position.x * 0.12,
+			1.15,
+			player.position.z - 4.5
+		),
+		Vector3.UP
 	)
 
 
@@ -290,7 +462,9 @@ func _lane_x(lane: int) -> float:
 func _build_world() -> void:
 	_build_environment()
 	_build_ground()
+	_build_ground_details()
 	_build_track()
+	_build_edge_guides()
 	_build_horizon()
 	_build_decorations()
 
@@ -335,7 +509,7 @@ func _build_environment() -> void:
 
 	add_child(sun_light)
 
-	var camera := Camera3D.new()
+	camera = Camera3D.new()
 
 	camera.position = Vector3(
 		0.0,
@@ -410,6 +584,262 @@ func _build_ground() -> void:
 	add_child(road_mesh)
 
 
+func _build_ground_details() -> void:
+	for i in range(46):
+		var side: float = (
+			-1.0
+			if i % 2 == 0
+			else 1.0
+		)
+
+		var x: float = (
+			side
+			* rng.randf_range(
+				3.4,
+				12.0
+			)
+		)
+
+		var z: float = rng.randf_range(
+			-52.0,
+			6.0
+		)
+
+		var roll: float = rng.randf()
+
+		var detail: Node3D
+
+		if roll < 0.45:
+			detail = _create_ground_patch(
+				x,
+				z
+			)
+
+		elif roll < 0.73:
+			detail = _create_rock(
+				x,
+				z
+			)
+
+		else:
+			detail = _create_data_grass(
+				x,
+				z
+			)
+
+		ground_details.append(detail)
+
+
+func _create_ground_patch(
+	x: float,
+	z: float
+) -> Node3D:
+	var root := Node3D.new()
+
+	root.position = Vector3(
+		x,
+		0.006,
+		z
+	)
+
+	add_child(root)
+
+	var patch := MeshInstance3D.new()
+	var mesh := CylinderMesh.new()
+
+	mesh.top_radius = rng.randf_range(
+		0.40,
+		1.10
+	)
+
+	mesh.bottom_radius = mesh.top_radius
+	mesh.height = 0.012
+	mesh.radial_segments = rng.randi_range(
+		5,
+		8
+	)
+
+	patch.mesh = mesh
+
+	patch.scale.z = rng.randf_range(
+		0.45,
+		1.15
+	)
+
+	patch.rotation.y = rng.randf_range(
+		0.0,
+		TAU
+	)
+
+	patch.material_override = _make_material(
+		Color(
+			rng.randf_range(0.09, 0.15),
+			rng.randf_range(0.17, 0.25),
+			rng.randf_range(0.08, 0.13),
+			1.0
+		),
+		Color.BLACK
+	)
+
+	root.add_child(patch)
+
+	return root
+
+
+func _create_rock(
+	x: float,
+	z: float
+) -> Node3D:
+	var root := Node3D.new()
+
+	root.position = Vector3(
+		x,
+		0.10,
+		z
+	)
+
+	add_child(root)
+
+	var rock := MeshInstance3D.new()
+	var mesh := SphereMesh.new()
+
+	mesh.radius = 0.22
+	mesh.height = 0.44
+	mesh.radial_segments = 6
+	mesh.rings = 3
+
+	rock.mesh = mesh
+
+	rock.scale = Vector3(
+		rng.randf_range(0.7, 1.5),
+		rng.randf_range(0.5, 1.1),
+		rng.randf_range(0.7, 1.6)
+	)
+
+	rock.rotation = Vector3(
+		rng.randf_range(-0.2, 0.2),
+		rng.randf_range(0.0, TAU),
+		rng.randf_range(-0.2, 0.2)
+	)
+
+	rock.material_override = _make_material(
+		Color(
+			0.12,
+			0.14,
+			0.13,
+			1.0
+		),
+		Color.BLACK
+	)
+
+	root.add_child(rock)
+
+	return root
+
+
+func _create_data_grass(
+	x: float,
+	z: float
+) -> Node3D:
+	var root := Node3D.new()
+
+	root.position = Vector3(
+		x,
+		0.0,
+		z
+	)
+
+	add_child(root)
+
+	var grass_material := _make_material(
+		Color(
+			0.06,
+			0.29,
+			0.16,
+			1.0
+		),
+		Color.BLACK
+	)
+
+	for blade_index in range(3):
+		var blade := MeshInstance3D.new()
+		var mesh := BoxMesh.new()
+
+		mesh.size = Vector3(
+			0.035,
+			rng.randf_range(
+				0.24,
+				0.48
+			),
+			0.025
+		)
+
+		blade.mesh = mesh
+
+		blade.position = Vector3(
+			float(blade_index - 1) * 0.08,
+			mesh.size.y * 0.5,
+			0.0
+		)
+
+		blade.rotation_degrees.z = (
+			float(blade_index - 1) * 13.0
+		)
+
+		blade.material_override = grass_material
+
+		root.add_child(blade)
+
+	# Una pequeña fibra de datos ocasional.
+	if rng.randf() < 0.35:
+		var fiber := MeshInstance3D.new()
+		var fiber_mesh := BoxMesh.new()
+
+		fiber_mesh.size = Vector3(
+			0.018,
+			0.32,
+			0.018
+		)
+
+		fiber.mesh = fiber_mesh
+		fiber.position.y = 0.16
+
+		fiber.material_override = _make_material(
+			CYAN,
+			CYAN
+		)
+
+		root.add_child(fiber)
+
+	return root
+
+
+func _update_ground_details(
+	delta: float
+) -> void:
+	for item in ground_details:
+		item.position.z += (
+			TRACK_SPEED * delta
+		)
+
+		if item.position.z > 8.0:
+			item.position.z -= 60.0
+
+			var side: float = (
+				-1.0
+				if item.position.x < 0.0
+				else 1.0
+			)
+
+			item.position.x = (
+				side
+				* rng.randf_range(
+					3.4,
+					12.0
+				)
+			)
+
+
 func _build_track() -> void:
 	var marker_material := _make_material(
 		Color(0.0, 0.50, 0.58, 1.0),
@@ -438,6 +868,36 @@ func _build_track() -> void:
 
 			add_child(marker)
 			lane_markers.append(marker)
+
+
+func _build_edge_guides() -> void:
+	var edge_material := _make_material(
+		Color(0.015, 0.14, 0.16, 1.0),
+		Color(0.0, 0.48, 0.54, 1.0)
+	)
+
+	for i in range(22):
+		for side in [-3.02, 3.02]:
+			var guide := MeshInstance3D.new()
+			var box := BoxMesh.new()
+
+			box.size = Vector3(
+				0.075,
+				0.055,
+				0.42
+			)
+
+			guide.mesh = box
+			guide.material_override = edge_material
+
+			guide.position = Vector3(
+				float(side),
+				0.040,
+				4.0 - float(i) * 2.0
+			)
+
+			add_child(guide)
+			lane_markers.append(guide)
 
 
 func _update_track(delta: float) -> void:
@@ -524,41 +984,75 @@ func _build_horizon() -> void:
 
 
 func _build_decorations() -> void:
-	for i in range(8):
-		var z: float = (
+	# Ya no repetimos secuencias fijas.
+	# Cada lateral recibe una combinación distinta
+	# de acacias, torres, balizas o espacio vacío.
+	for i in range(14):
+		var base_z: float = (
 			-4.0
-			- float(i) * 5.5
+			- float(i) * 4.2
 		)
 
-		var left: Node3D
+		for side in [-1.0, 1.0]:
+			var roll: float = rng.randf()
 
-		if i % 2 == 0:
-			left = _create_acacia(
-				-4.6,
-				z
-			)
-		else:
-			left = _create_tower(
-				-4.8,
-				z
-			)
+			# Dejar algunos huecos evita el efecto túnel.
+			if roll > 0.88:
+				continue
 
-		decorations.append(left)
-
-		var right: Node3D
-
-		if i % 2 == 0:
-			right = _create_tower(
-				4.8,
-				z - 2.0
-			)
-		else:
-			right = _create_acacia(
-				4.6,
-				z - 2.0
+			var x: float = (
+				float(side)
+				* rng.randf_range(
+					3.7,
+					5.7
+				)
 			)
 
-		decorations.append(right)
+			var z: float = (
+				base_z
+				+ rng.randf_range(
+					-1.2,
+					1.2
+				)
+			)
+
+			var item: Node3D
+
+			if roll < 0.43:
+				item = _create_acacia(
+					x,
+					z
+				)
+
+			elif roll < 0.72:
+				item = _create_tower(
+					x,
+					z
+				)
+
+			else:
+				item = _create_data_beacon(
+					x,
+					z
+				)
+
+			var uniform_scale: float = (
+				rng.randf_range(
+					0.82,
+					1.20
+				)
+			)
+
+			item.scale = Vector3.ONE * uniform_scale
+
+			item.rotation.y = deg_to_rad(
+				rng.randf_range(
+					-12.0,
+					12.0
+				)
+			)
+
+			decorations.append(item)
 
 
 func _create_acacia(
@@ -575,84 +1069,168 @@ func _create_acacia(
 
 	add_child(root)
 
+	var bark := _make_material(
+		Color(0.18, 0.13, 0.075, 1.0),
+		Color.BLACK
+	)
+
+	var foliage := _make_material(
+		Color(0.055, 0.23, 0.14, 1.0),
+		Color.BLACK
+	)
+
+	var steel := _make_material(
+		Color(0.055, 0.09, 0.11, 1.0),
+		Color.BLACK
+	)
+
+	var energy := _make_material(
+		Color(0.0, 0.38, 0.42, 1.0),
+		CYAN
+	)
+
+	# Tronco principal.
 	var trunk := MeshInstance3D.new()
 	var trunk_mesh := CylinderMesh.new()
 
 	trunk_mesh.top_radius = 0.10
-	trunk_mesh.bottom_radius = 0.18
-	trunk_mesh.height = 2.2
+	trunk_mesh.bottom_radius = 0.20
+	trunk_mesh.height = 2.35
 	trunk_mesh.radial_segments = 8
 
 	trunk.mesh = trunk_mesh
-
-	trunk.position.y = 1.1
-
-	trunk.material_override = (
-		_make_material(
-			Color(
-				0.20,
-				0.15,
-				0.08,
-				1.0
-			),
-			Color.BLACK
-		)
-	)
+	trunk.position.y = 1.175
+	trunk.material_override = bark
 
 	root.add_child(trunk)
 
-	var crown := MeshInstance3D.new()
-	var crown_mesh := SphereMesh.new()
+	# Núcleo tecnológico incrustado.
+	var spine := MeshInstance3D.new()
+	var spine_mesh := BoxMesh.new()
 
-	crown_mesh.radius = 1.0
-	crown_mesh.height = 2.0
-	crown_mesh.radial_segments = 12
-	crown_mesh.rings = 6
-
-	crown.mesh = crown_mesh
-
-	crown.position.y = 2.35
-
-	crown.scale = Vector3(
-		1.65,
-		0.32,
-		0.72
+	spine_mesh.size = Vector3(
+		0.075,
+		1.35,
+		0.075
 	)
 
-	crown.material_override = (
-		_make_material(
-			Color(
-				0.08,
-				0.26,
-				0.17,
-				1.0
-			),
-			Color.BLACK
+	spine.mesh = spine_mesh
+
+	spine.position = Vector3(
+		0.0,
+		1.25,
+		0.16
+	)
+
+	spine.material_override = energy
+
+	root.add_child(spine)
+
+	# Collar de red.
+	var collar := MeshInstance3D.new()
+	var collar_mesh := CylinderMesh.new()
+
+	collar_mesh.top_radius = 0.26
+	collar_mesh.bottom_radius = 0.26
+	collar_mesh.height = 0.07
+	collar_mesh.radial_segments = 12
+
+	collar.mesh = collar_mesh
+	collar.position.y = 1.55
+	collar.material_override = steel
+
+	root.add_child(collar)
+
+	var collar_core := MeshInstance3D.new()
+	var collar_core_mesh := CylinderMesh.new()
+
+	collar_core_mesh.top_radius = 0.19
+	collar_core_mesh.bottom_radius = 0.19
+	collar_core_mesh.height = 0.085
+	collar_core_mesh.radial_segments = 12
+
+	collar_core.mesh = collar_core_mesh
+	collar_core.position.y = 1.555
+	collar_core.material_override = energy
+
+	root.add_child(collar_core)
+
+	# Ramas biomecánicas.
+	for side in [-1.0, 1.0]:
+		var branch := MeshInstance3D.new()
+		var branch_mesh := CylinderMesh.new()
+
+		branch_mesh.top_radius = 0.055
+		branch_mesh.bottom_radius = 0.09
+		branch_mesh.height = 1.25
+		branch_mesh.radial_segments = 7
+
+		branch.mesh = branch_mesh
+
+		branch.position = Vector3(
+			float(side) * 0.38,
+			2.0,
+			0.0
 		)
-	)
 
-	root.add_child(crown)
+		branch.rotation_degrees.z = (
+			float(side) * 56.0
+		)
 
+		branch.material_override = bark
+
+		root.add_child(branch)
+
+	# Copa principal en tres masas para leer mejor como acacia.
+	for data in [
+		[-0.72, 2.47, 1.28],
+		[0.0, 2.60, 1.55],
+		[0.72, 2.47, 1.28]
+	]:
+		var crown := MeshInstance3D.new()
+		var crown_mesh := SphereMesh.new()
+
+		crown_mesh.radius = 0.65
+		crown_mesh.height = 1.30
+		crown_mesh.radial_segments = 12
+		crown_mesh.rings = 6
+
+		crown.mesh = crown_mesh
+
+		crown.position = Vector3(
+			float(data[0]),
+			float(data[1]),
+			0.0
+		)
+
+		crown.scale = Vector3(
+			float(data[2]),
+			0.28,
+			0.70
+		)
+
+		crown.material_override = foliage
+
+		root.add_child(crown)
+
+	# Nodo de comunicaciones.
 	var node_light := MeshInstance3D.new()
 	var node_mesh := SphereMesh.new()
 
-	node_mesh.radius = 0.11
-	node_mesh.height = 0.22
+	node_mesh.radius = 0.12
+	node_mesh.height = 0.24
+	node_mesh.radial_segments = 10
+	node_mesh.rings = 5
 
 	node_light.mesh = node_mesh
 
 	node_light.position = Vector3(
 		0.0,
-		2.25,
-		0.58
+		2.12,
+		0.32
 	)
 
-	node_light.material_override = (
-		_make_material(
-			CYAN,
-			CYAN
-		)
-	)
+	node_light.material_override = energy
 
 	root.add_child(node_light)
 
@@ -673,88 +1251,234 @@ func _create_tower(
 
 	add_child(root)
 
+	var dark := _make_material(
+		Color(0.035, 0.065, 0.085, 1.0),
+		Color.BLACK
+	)
+
+	var steel := _make_material(
+		Color(0.12, 0.18, 0.21, 1.0),
+		Color.BLACK
+	)
+
+	var energy := _make_material(
+		Color(0.0, 0.28, 0.34, 1.0),
+		CYAN
+	)
+
+	# Base.
+	var base := MeshInstance3D.new()
+	var base_mesh := BoxMesh.new()
+
+	base_mesh.size = Vector3(
+		0.90,
+		0.22,
+		0.90
+	)
+
+	base.mesh = base_mesh
+
+	base.position.y = 0.11
+	base.material_override = dark
+
+	root.add_child(base)
+
+	# Columna central.
 	var column := MeshInstance3D.new()
 	var column_mesh := BoxMesh.new()
 
 	column_mesh.size = Vector3(
-		0.48,
-		2.8,
-		0.48
+		0.52,
+		2.85,
+		0.52
 	)
 
 	column.mesh = column_mesh
 
-	column.position.y = 1.4
-
-	column.material_override = (
-		_make_material(
-			Color(
-				0.055,
-				0.09,
-				0.12,
-				1.0
-			),
-			Color.BLACK
-		)
-	)
+	column.position.y = 1.53
+	column.material_override = dark
 
 	root.add_child(column)
 
+	# Núcleo luminoso.
 	var core := MeshInstance3D.new()
 	var core_mesh := BoxMesh.new()
 
 	core_mesh.size = Vector3(
-		0.17,
-		1.7,
-		0.52
+		0.15,
+		1.85,
+		0.54
 	)
 
 	core.mesh = core_mesh
 
 	core.position = Vector3(
 		0.0,
-		1.45,
-		0.06
+		1.55,
+		0.05
 	)
 
-	core.material_override = (
-		_make_material(
-			Color(
-				0.0,
-				0.35,
-				0.42,
-				1.0
-			),
-			CYAN
-		)
-	)
+	core.material_override = energy
 
 	root.add_child(core)
 
+	# Dos placas laterales.
+	for side in [-1.0, 1.0]:
+		var fin := MeshInstance3D.new()
+		var fin_mesh := BoxMesh.new()
+
+		fin_mesh.size = Vector3(
+			0.18,
+			1.55,
+			0.34
+		)
+
+		fin.mesh = fin_mesh
+
+		fin.position = Vector3(
+			float(side) * 0.36,
+			1.55,
+			0.0
+		)
+
+		fin.rotation_degrees.z = (
+			float(side) * 7.0
+		)
+
+		fin.material_override = steel
+
+		root.add_child(fin)
+
+	# Cabezal.
+	var crown := MeshInstance3D.new()
+	var crown_mesh := BoxMesh.new()
+
+	crown_mesh.size = Vector3(
+		1.15,
+		0.18,
+		0.62
+	)
+
+	crown.mesh = crown_mesh
+
+	crown.position.y = 3.0
+	crown.material_override = steel
+
+	root.add_child(crown)
+
+	# Antena.
 	var antenna := MeshInstance3D.new()
 	var antenna_mesh := CylinderMesh.new()
 
-	antenna_mesh.top_radius = 0.03
-	antenna_mesh.bottom_radius = 0.05
-	antenna_mesh.height = 1.0
+	antenna_mesh.top_radius = 0.025
+	antenna_mesh.bottom_radius = 0.055
+	antenna_mesh.height = 1.15
+	antenna_mesh.radial_segments = 8
 
 	antenna.mesh = antenna_mesh
-
-	antenna.position.y = 3.3
-
-	antenna.material_override = (
-		_make_material(
-			Color(
-				0.2,
-				0.3,
-				0.34,
-				1.0
-			),
-			Color.BLACK
-		)
-	)
+	antenna.position.y = 3.65
+	antenna.material_override = steel
 
 	root.add_child(antenna)
+
+	# Baliza superior.
+	var beacon := MeshInstance3D.new()
+	var beacon_mesh := SphereMesh.new()
+
+	beacon_mesh.radius = 0.105
+	beacon_mesh.height = 0.21
+
+	beacon.mesh = beacon_mesh
+	beacon.position.y = 4.20
+	beacon.material_override = energy
+
+	root.add_child(beacon)
+
+	return root
+
+
+# ============================================================
+# BALIZAS DE DATOS
+# ============================================================
+
+func _create_data_beacon(
+	x: float,
+	z: float
+) -> Node3D:
+	var root := Node3D.new()
+
+	root.position = Vector3(
+		x,
+		0.0,
+		z
+	)
+
+	add_child(root)
+
+	var dark := _make_material(
+		Color(0.02, 0.055, 0.070, 1.0),
+		Color.BLACK
+	)
+
+	var energy := _make_material(
+		Color(0.0, 0.42, 0.48, 1.0),
+		CYAN
+	)
+
+	var stem := MeshInstance3D.new()
+	var stem_mesh := CylinderMesh.new()
+
+	stem_mesh.top_radius = 0.035
+	stem_mesh.bottom_radius = 0.055
+	stem_mesh.height = 1.05
+	stem_mesh.radial_segments = 8
+
+	stem.mesh = stem_mesh
+	stem.position.y = 0.525
+	stem.material_override = dark
+
+	root.add_child(stem)
+
+	var outer := MeshInstance3D.new()
+	var outer_mesh := CylinderMesh.new()
+
+	outer_mesh.top_radius = 0.30
+	outer_mesh.bottom_radius = 0.30
+	outer_mesh.height = 0.045
+	outer_mesh.radial_segments = 16
+
+	outer.mesh = outer_mesh
+	outer.position.y = 1.10
+	outer.material_override = energy
+
+	root.add_child(outer)
+
+	# Centro oscuro para simular anillo.
+	var inner := MeshInstance3D.new()
+	var inner_mesh := CylinderMesh.new()
+
+	inner_mesh.top_radius = 0.19
+	inner_mesh.bottom_radius = 0.19
+	inner_mesh.height = 0.052
+	inner_mesh.radial_segments = 16
+
+	inner.mesh = inner_mesh
+	inner.position.y = 1.105
+	inner.material_override = dark
+
+	root.add_child(inner)
+
+	var pulse := MeshInstance3D.new()
+	var pulse_mesh := SphereMesh.new()
+
+	pulse_mesh.radius = 0.09
+	pulse_mesh.height = 0.18
+
+	pulse.mesh = pulse_mesh
+	pulse.position.y = 1.14
+	pulse.material_override = energy
+
+	root.add_child(pulse)
 
 	return root
 
@@ -766,7 +1490,43 @@ func _update_decorations(delta: float) -> void:
 		)
 
 		if item.position.z > 8.0:
-			item.position.z -= 48.0
+			item.position.z -= rng.randf_range(
+				48.0,
+				58.0
+			)
+
+			var side: float = (
+				-1.0
+				if item.position.x < 0.0
+				else 1.0
+			)
+
+			item.position.x = (
+				side
+				* rng.randf_range(
+					3.7,
+					5.7
+				)
+			)
+
+			var uniform_scale: float = (
+				rng.randf_range(
+					0.82,
+					1.20
+				)
+			)
+
+			item.scale = (
+				Vector3.ONE
+				* uniform_scale
+			)
+
+			item.rotation.y = deg_to_rad(
+				rng.randf_range(
+					-14.0,
+					14.0
+				)
+			)
 
 
 # ============================================================
@@ -993,6 +1753,8 @@ func _collect_pickup(
 		"packet":
 			score += PACKET_SCORE
 
+			_play_safe_sfx(1.0)
+
 			_set_status(
 				"PAQUETE SEGURO // +%d"
 				% PACKET_SCORE,
@@ -1000,6 +1762,8 @@ func _collect_pickup(
 			)
 
 		"shield":
+			_play_safe_sfx(1.22)
+
 			shield = mini(
 				100,
 				shield + SHIELD_PICKUP
@@ -1012,6 +1776,9 @@ func _collect_pickup(
 			)
 
 		"malware":
+			sfx_malware.pitch_scale = 1.0
+			sfx_malware.play()
+
 			shield = maxi(
 				0,
 				shield - MALWARE_DAMAGE
@@ -1167,15 +1934,25 @@ func _build_hud() -> void:
 		"PAUSA"
 	)
 
+	pause_button.custom_minimum_size = Vector2(
+		118.0,
+		44.0
+	)
+
+	pause_button.add_theme_font_size_override(
+		"font_size",
+		16
+	)
+
 	ui_root.add_child(pause_button)
 
 	pause_button.set_anchors_preset(
 		Control.PRESET_TOP_RIGHT
 	)
 
-	pause_button.offset_left = -155.0
+	pause_button.offset_left = -138.0
 	pause_button.offset_top = 20.0
-	pause_button.offset_right = -20.0
+	pause_button.offset_right = -18.0
 	pause_button.offset_bottom = 65.0
 
 	pause_button.pressed.connect(
