@@ -1,8 +1,8 @@
 class_name Rhino3D
 extends Node3D
 
-# Packet Runner // Rhino 3D Prototype v0.8
-# Sculpted Cyber Rhino
+# Packet Runner // Rhino 3D Prototype v0.9.1
+# Compact Hero Pass // Promo Proportions
 
 const RHINO_SKIN := Color(0.43, 0.47, 0.52, 1.0)
 const RHINO_LIGHT := Color(0.59, 0.62, 0.67, 1.0)
@@ -426,42 +426,42 @@ func _build_model() -> void:
 	_add_part(
 		body_root,
 		"ShoulderLine",
-		_capsule(0.32, 1.18),
+		_capsule(0.36, 1.28),
 		skin,
-		Vector3(0.0, 0.24, 0.02),
+		Vector3(0.0, 0.25, 0.02),
 		Vector3(0.0, 0.0, 90.0),
-		Vector3(1.0, 1.0, 0.96)
+		Vector3(1.07, 1.0, 1.00)
 	)
 
 	# Caja torácica vertical, compacta y pesada.
 	_add_part(
 		body_root,
 		"RibCage",
-		_capsule(0.41, 0.96),
+		_capsule(0.43, 0.90),
 		skin,
-		Vector3(0.0, -0.02, -0.01),
+		Vector3(0.0, 0.015, -0.01),
 		Vector3.ZERO,
-		Vector3(1.04, 1.0, 0.88)
+		Vector3(1.08, 1.0, 0.96)
 	)
 
 	# Abdomen más estrecho para definir cintura.
 	_add_part(
 		body_root,
 		"Abdomen",
-		_capsule(0.31, 0.68),
+		_capsule(0.265, 0.60),
 		skin_dark,
-		Vector3(0.0, -0.34, -0.02),
+		Vector3(0.0, -0.32, -0.02),
 		Vector3.ZERO,
-		Vector3(1.02, 1.0, 0.90)
+		Vector3(1.00, 1.0, 0.92)
 	)
 
 	# Joroba dorsal característica del rinoceronte.
 	_add_part(
 		body_root,
 		"ShoulderHump",
-		_capsule(0.25, 0.76),
+		_capsule(0.275, 0.79),
 		skin_light,
-		Vector3(0.0, 0.43, -0.11),
+		Vector3(0.0, 0.445, -0.11),
 		Vector3(0.0, 0.0, 90.0),
 		Vector3(1.0, 1.0, 0.91)
 	)
@@ -552,72 +552,7 @@ func _build_model() -> void:
 		Vector3(1.0, 1.0, 0.72)
 	)
 
-	# =========================================================
-	# MOCHILA RHYNUS / DATA CORE
-	# =========================================================
-
-	_add_part(
-		body_root,
-		"BackModule",
-		_capsule(0.22, 0.58),
-		armor_dark,
-		Vector3(0.0, 0.16, -0.55),
-		Vector3.ZERO,
-		Vector3(1.12, 1.0, 0.78)
-	)
-
-	_add_part(
-		body_root,
-		"BackShell",
-		_capsule(0.16, 0.43),
-		armor_mid,
-		Vector3(0.0, 0.18, -0.68),
-		Vector3.ZERO,
-		Vector3(1.0, 1.0, 0.70)
-	)
-
-	_add_box(
-		body_root,
-		"BackEnergy",
-		Vector3(0.18, 0.30, 0.030),
-		glow,
-		Vector3(0.0, 0.18, -0.795)
-	)
-
-	_add_box(
-		body_root,
-		"BackRailL",
-		Vector3(0.035, 0.36, 0.035),
-		glow,
-		Vector3(-0.16, 0.17, -0.69)
-	)
-
-	_add_box(
-		body_root,
-		"BackRailR",
-		Vector3(0.035, 0.36, 0.035),
-		glow,
-		Vector3(0.16, 0.17, -0.69)
-	)
-
-	# Correas visibles desde tres cuartos.
-	_add_part(
-		body_root,
-		"StrapL",
-		_capsule(0.025, 0.58),
-		armor_dark,
-		Vector3(-0.30, 0.25, -0.22),
-		Vector3(18.0, 0.0, -10.0)
-	)
-
-	_add_part(
-		body_root,
-		"StrapR",
-		_capsule(0.025, 0.58),
-		armor_dark,
-		Vector3(0.30, 0.25, -0.22),
-		Vector3(18.0, 0.0, 10.0)
-	)
+	# Mochila legacy eliminada en v0.9.1.
 
 	# =========================================================
 	# CORREAS FRONTALES DE LA MOCHILA
@@ -685,31 +620,211 @@ func _build_model() -> void:
 	_add_part(
 		body_root,
 		"Neck",
-		_capsule(0.34, 0.72),
+		_capsule(0.37, 0.57),
 		skin,
-		Vector3(0.0, 0.46, 0.32),
-		Vector3(70.0, 0.0, 0.0),
-		Vector3(1.12, 1.0, 1.02)
+		Vector3(0.0, 0.41, 0.24),
+		Vector3(55.0, 0.0, 0.0),
+		Vector3(1.16, 1.0, 1.08)
 	)
 
 	# Masa inferior que fusiona cuello y pecho.
 	_add_part(
 		body_root,
 		"NeckBase",
-		_capsule(0.27, 0.60),
+		_capsule(0.31, 0.52),
 		skin_dark,
-		Vector3(0.0, 0.31, 0.25),
-		Vector3(63.0, 0.0, 0.0),
-		Vector3(1.10, 1.0, 1.0)
+		Vector3(0.0, 0.28, 0.18),
+		Vector3(48.0, 0.0, 0.0),
+		Vector3(1.13, 1.0, 1.06)
 	)
 
 	# =========================================================
 	# CABEZA
 	# =========================================================
 
+	# =========================================================
+	# MOCHILA RHYNUS // lectura clara de backpack
+	# =========================================================
+
+	var pack_root := Node3D.new()
+
+	pack_root.name = "RhynusBackpack"
+
+	pack_root.position = Vector3(
+		0.0,
+		0.07,
+		-0.43
+	)
+
+	body_root.add_child(
+		pack_root
+	)
+
+	# Cuerpo principal, compacto y rectangular.
+	_add_box(
+		pack_root,
+		"PackBody",
+		Vector3(
+			0.48,
+			0.52,
+			0.18
+		),
+		armor_mid,
+		Vector3(
+			0.0,
+			-0.02,
+			0.0
+		)
+	)
+
+	# Tapa superior reconocible.
+	_add_box(
+		pack_root,
+		"PackFlap",
+		Vector3(
+			0.52,
+			0.16,
+			0.27
+		),
+		armor_dark,
+		Vector3(
+			0.0,
+			0.245,
+			0.015
+		),
+		Vector3(
+			-6.0,
+			0.0,
+			0.0
+		)
+	)
+
+	# Bolsillos laterales.
+	_add_box(
+		pack_root,
+		"PackPocketL",
+		Vector3(
+			0.15,
+			0.30,
+			0.19
+		),
+		armor_light,
+		Vector3(
+			-0.285,
+			-0.055,
+			0.005
+		)
+	)
+
+	_add_box(
+		pack_root,
+		"PackPocketR",
+		Vector3(
+			0.15,
+			0.30,
+			0.19
+		),
+		armor_light,
+		Vector3(
+			0.285,
+			-0.055,
+			0.005
+		)
+	)
+
+	# Asa.
+	_add_part(
+		pack_root,
+		"PackHandle",
+		_capsule(
+			0.032,
+			0.28
+		),
+		armor_dark,
+		Vector3(
+			0.0,
+			0.37,
+			-0.005
+		),
+		Vector3(
+			0.0,
+			0.0,
+			90.0
+		)
+	)
+
+	# Luz de datos pequeña:
+	# información visual, no un gran botón.
+	_add_box(
+		pack_root,
+		"PackDataStrip",
+		Vector3(
+			0.075,
+			0.24,
+			0.026
+		),
+		glow,
+		Vector3(
+			0.0,
+			0.00,
+			-0.132
+		)
+	)
+
+	# Tirantes visibles desde perfil.
+	_add_part(
+		body_root,
+		"PackStrapL",
+		_capsule(
+			0.032,
+			0.72
+		),
+		armor_dark,
+		Vector3(
+			-0.32,
+			0.01,
+			-0.28
+		),
+		Vector3(
+			7.0,
+			0.0,
+			-5.0
+		)
+	)
+
+	_add_part(
+		body_root,
+		"PackStrapR",
+		_capsule(
+			0.032,
+			0.72
+		),
+		armor_dark,
+		Vector3(
+			0.32,
+			0.01,
+			-0.28
+		),
+		Vector3(
+			7.0,
+			0.0,
+			5.0
+		)
+	)
+
+
 	head_pivot = Node3D.new()
 	head_pivot.name = "HeadPivot"
-	head_pivot.position = Vector3(0.0, 0.59, 0.58)
+	head_pivot.position = Vector3(0.0, 0.55, 0.46)
+
+	# La PROMO funciona mejor con una cabeza
+	# ligeramente sobredimensionada.
+	head_pivot.scale = Vector3(
+		1.10,
+		1.08,
+		0.94
+	)
+
 	body_root.add_child(head_pivot)
 
 	# =========================================================
@@ -720,22 +835,22 @@ func _build_model() -> void:
 	_add_part(
 		head_pivot,
 		"Cranium",
-		_capsule(0.27, 0.62),
+		_capsule(0.305, 0.57),
 		skin,
-		Vector3(0.0, 0.06, 0.10),
+		Vector3(0.0, 0.055, 0.055),
 		Vector3(90.0, 0.0, 0.0),
-		Vector3(1.12, 1.0, 0.95)
+		Vector3(1.18, 1.05, 0.90)
 	)
 
 	# Frente ancha y baja.
 	_add_part(
 		head_pivot,
 		"ForeheadMass",
-		_capsule(0.15, 0.43),
+		_capsule(0.175, 0.46),
 		skin_light,
-		Vector3(0.0, 0.17, 0.24),
+		Vector3(0.0, 0.17, 0.17),
 		Vector3(0.0, 0.0, 90.0),
-		Vector3(1.0, 0.86, 0.90)
+		Vector3(1.10, 0.92, 0.88)
 	)
 
 	# =========================================================
@@ -746,43 +861,43 @@ func _build_model() -> void:
 	_add_part(
 		head_pivot,
 		"NasalBridge",
-		_capsule(0.145, 0.58),
+		_capsule(0.155, 0.46),
 		skin,
-		Vector3(0.0, 0.015, 0.45),
+		Vector3(0.0, 0.010, 0.34),
 		Vector3(90.0, 0.0, 0.0),
-		Vector3(1.05, 1.0, 0.88)
+		Vector3(1.12, 1.0, 0.82)
 	)
 
 	# Masa principal del hocico.
 	_add_part(
 		head_pivot,
 		"MuzzleMain",
-		_capsule(0.165, 0.47),
+		_capsule(0.185, 0.38),
 		skin_light,
-		Vector3(0.0, -0.070, 0.70),
+		Vector3(0.0, -0.070, 0.56),
 		Vector3(90.0, 0.0, 0.0),
-		Vector3(1.12, 1.0, 0.84)
+		Vector3(1.20, 1.0, 0.84)
 	)
 
 	# Laterales del morro. Dan anchura sin crear una nariz circular.
 	_add_part(
 		head_pivot,
 		"MuzzleSideL",
-		_capsule(0.080, 0.27),
+		_capsule(0.088, 0.24),
 		skin,
-		Vector3(-0.105, -0.075, 0.77),
+		Vector3(-0.115, -0.075, 0.63),
 		Vector3(90.0, 0.0, 0.0),
-		Vector3(0.92, 1.0, 0.78)
+		Vector3(0.96, 1.0, 0.80)
 	)
 
 	_add_part(
 		head_pivot,
 		"MuzzleSideR",
-		_capsule(0.080, 0.27),
+		_capsule(0.088, 0.24),
 		skin,
-		Vector3(0.105, -0.075, 0.77),
+		Vector3(0.115, -0.075, 0.63),
 		Vector3(90.0, 0.0, 0.0),
-		Vector3(0.92, 1.0, 0.78)
+		Vector3(0.96, 1.0, 0.80)
 	)
 
 	# Punta nasal achatada y ancha.
@@ -791,9 +906,9 @@ func _build_model() -> void:
 		"NasalTip",
 		_sphere(),
 		skin_dark,
-		Vector3(0.0, -0.060, 0.89),
+		Vector3(0.0, -0.060, 0.72),
 		Vector3.ZERO,
-		Vector3(0.235, 0.105, 0.105)
+		Vector3(0.255, 0.115, 0.095)
 	)
 
 	# Narinas laterales, no frontales tipo cerdito.
@@ -802,7 +917,7 @@ func _build_model() -> void:
 		"NostrilL",
 		_sphere(),
 		armor_dark,
-		Vector3(-0.135, -0.072, 0.955),
+		Vector3(-0.145, -0.072, 0.785),
 		Vector3.ZERO,
 		Vector3(0.033, 0.023, 0.016)
 	)
@@ -812,7 +927,7 @@ func _build_model() -> void:
 		"NostrilR",
 		_sphere(),
 		armor_dark,
-		Vector3(0.135, -0.072, 0.955),
+		Vector3(0.145, -0.072, 0.785),
 		Vector3.ZERO,
 		Vector3(0.033, 0.023, 0.016)
 	)
@@ -821,9 +936,9 @@ func _build_model() -> void:
 	_add_part(
 		head_pivot,
 		"LowerJaw",
-		_capsule(0.105, 0.39),
+		_capsule(0.115, 0.34),
 		skin_dark,
-		Vector3(0.0, -0.185, 0.64),
+		Vector3(0.0, -0.180, 0.51),
 		Vector3(90.0, 0.0, 0.0),
 		Vector3(1.02, 1.0, 0.82)
 	)
@@ -834,7 +949,7 @@ func _build_model() -> void:
 		"LowerLip",
 		_capsule(0.042, 0.20),
 		skin,
-		Vector3(0.0, -0.176, 0.825),
+		Vector3(0.0, -0.170, 0.675),
 		Vector3(0.0, 0.0, 90.0),
 		Vector3(1.0, 0.70, 0.70)
 	)
@@ -845,7 +960,7 @@ func _build_model() -> void:
 		"MouthLine",
 		Vector3(0.22, 0.014, 0.045),
 		armor_dark,
-		Vector3(0.0, -0.153, 0.80)
+		Vector3(0.0, -0.150, 0.655)
 	)
 
 
@@ -855,7 +970,7 @@ func _build_model() -> void:
 		"SmileL",
 		Vector3(0.115, 0.014, 0.035),
 		armor_dark,
-		Vector3(-0.055, -0.158, 0.815),
+		Vector3(-0.060, -0.155, 0.668),
 		Vector3(0.0, 0.0, -19.0)
 	)
 
@@ -864,12 +979,53 @@ func _build_model() -> void:
 		"SmileR",
 		Vector3(0.115, 0.014, 0.035),
 		armor_dark,
-		Vector3(0.055, -0.158, 0.815),
+		Vector3(0.060, -0.155, 0.668),
 		Vector3(0.0, 0.0, 19.0)
 	)
 
 	smile_l.visible = false
 	smile_r.visible = false
+
+
+	# Mejillas suaves.
+	# Refuerzan el aspecto de personaje sin
+	# convertir el hocico en rostro humano.
+
+	_add_part(
+		head_pivot,
+		"CheekL",
+		_sphere(),
+		skin_light,
+		Vector3(
+			-0.205,
+			-0.095,
+			0.54
+		),
+		Vector3.ZERO,
+		Vector3(
+			0.115,
+			0.085,
+			0.095
+		)
+	)
+
+	_add_part(
+		head_pivot,
+		"CheekR",
+		_sphere(),
+		skin_light,
+		Vector3(
+			0.205,
+			-0.095,
+			0.54
+		),
+		Vector3.ZERO,
+		Vector3(
+			0.115,
+			0.085,
+			0.095
+		)
+	)
 
 
 	# =========================================================
@@ -880,27 +1036,27 @@ func _build_model() -> void:
 	_add_part(
 		head_pivot,
 		"HornBase",
-		_cone(0.075, 0.125, 0.18),
+		_cone(0.080, 0.145, 0.19),
 		horn,
-		Vector3(0.0, 0.105, 0.72),
+		Vector3(0.0, 0.110, 0.57),
 		Vector3(65.0, 0.0, 0.0)
 	)
 
 	_add_part(
 		head_pivot,
 		"MainHorn",
-		_cone(0.018, 0.095, 0.43),
+		_cone(0.025, 0.115, 0.38),
 		horn,
-		Vector3(0.0, 0.22, 0.83),
+		Vector3(0.0, 0.215, 0.67),
 		Vector3(66.0, 0.0, 0.0)
 	)
 
 	_add_part(
 		head_pivot,
 		"SecondHorn",
-		_cone(0.016, 0.062, 0.23),
+		_cone(0.014, 0.052, 0.17),
 		horn,
-		Vector3(0.0, 0.265, 0.50),
+		Vector3(0.0, 0.255, 0.39),
 		Vector3(57.0, 0.0, 0.0)
 	)
 
@@ -914,9 +1070,9 @@ func _build_model() -> void:
 		"LeftEyeWhite",
 		_sphere(),
 		eye_white,
-		Vector3(-0.175, 0.108, 0.388),
+		Vector3(-0.188, 0.112, 0.340),
 		Vector3.ZERO,
-		Vector3(0.125, 0.110, 0.054)
+		Vector3(0.145, 0.128, 0.060)
 	)
 
 	_add_part(
@@ -924,9 +1080,9 @@ func _build_model() -> void:
 		"RightEyeWhite",
 		_sphere(),
 		eye_white,
-		Vector3(0.175, 0.108, 0.388),
+		Vector3(0.188, 0.112, 0.340),
 		Vector3.ZERO,
-		Vector3(0.125, 0.110, 0.054)
+		Vector3(0.145, 0.128, 0.060)
 	)
 
 	# Iris cyan.
@@ -935,9 +1091,9 @@ func _build_model() -> void:
 		"LeftIris",
 		_sphere(),
 		eye,
-		Vector3(-0.175, 0.105, 0.433),
+		Vector3(-0.188, 0.108, 0.389),
 		Vector3.ZERO,
-		Vector3(0.076, 0.082, 0.026)
+		Vector3(0.086, 0.092, 0.030)
 	)
 
 	_add_part(
@@ -945,9 +1101,9 @@ func _build_model() -> void:
 		"RightIris",
 		_sphere(),
 		eye,
-		Vector3(0.175, 0.105, 0.433),
+		Vector3(0.188, 0.108, 0.389),
 		Vector3.ZERO,
-		Vector3(0.076, 0.082, 0.026)
+		Vector3(0.086, 0.092, 0.030)
 	)
 
 	# Pupilas oscuras.
@@ -956,9 +1112,9 @@ func _build_model() -> void:
 		"LeftPupil",
 		_sphere(),
 		eye_pupil,
-		Vector3(-0.175, 0.105, 0.456),
+		Vector3(-0.188, 0.108, 0.414),
 		Vector3.ZERO,
-		Vector3(0.043, 0.055, 0.016)
+		Vector3(0.047, 0.060, 0.018)
 	)
 
 	_add_part(
@@ -966,9 +1122,9 @@ func _build_model() -> void:
 		"RightPupil",
 		_sphere(),
 		eye_pupil,
-		Vector3(0.175, 0.105, 0.456),
+		Vector3(0.188, 0.108, 0.414),
 		Vector3.ZERO,
-		Vector3(0.043, 0.055, 0.016)
+		Vector3(0.047, 0.060, 0.018)
 	)
 
 	# Reflejo luminoso que les da vida.
@@ -979,7 +1135,7 @@ func _build_model() -> void:
 		eye_white,
 		Vector3(-0.194, 0.137, 0.468),
 		Vector3.ZERO,
-		Vector3(0.013, 0.016, 0.007)
+		Vector3(0.016, 0.020, 0.008)
 	)
 
 	_add_part(
@@ -989,7 +1145,7 @@ func _build_model() -> void:
 		eye_white,
 		Vector3(0.156, 0.137, 0.468),
 		Vector3.ZERO,
-		Vector3(0.013, 0.016, 0.007)
+		Vector3(0.016, 0.020, 0.008)
 	)
 
 	# Cejas más curvas visualmente y menos Angry Birds.
@@ -999,7 +1155,7 @@ func _build_model() -> void:
 		_capsule(0.030, 0.17),
 		armor_dark,
 		Vector3(-0.17, 0.205, 0.375),
-		Vector3(0.0, 0.0, 78.0)
+		Vector3(0.0, 0.0, 86.0)
 	)
 
 	_add_part(
@@ -1008,7 +1164,7 @@ func _build_model() -> void:
 		_capsule(0.030, 0.17),
 		armor_dark,
 		Vector3(0.17, 0.205, 0.375),
-		Vector3(0.0, 0.0, 102.0)
+		Vector3(0.0, 0.0, 94.0)
 	)
 
 
@@ -1019,18 +1175,18 @@ func _build_model() -> void:
 	_add_part(
 		head_pivot,
 		"EarL",
-		_cone(0.018, 0.095, 0.25),
+		_cone(0.020, 0.102, 0.29),
 		skin_dark,
-		Vector3(-0.245, 0.31, -0.01),
+		Vector3(-0.255, 0.335, -0.015),
 		Vector3(-14.0, 0.0, -27.0)
 	)
 
 	_add_part(
 		head_pivot,
 		"EarR",
-		_cone(0.018, 0.095, 0.25),
+		_cone(0.020, 0.102, 0.29),
 		skin_dark,
-		Vector3(0.245, 0.31, -0.01),
+		Vector3(0.255, 0.335, -0.015),
 		Vector3(-14.0, 0.0, 27.0)
 	)
 
@@ -1177,7 +1333,7 @@ func _build_arm(
 	_add_part(
 		pivot,
 		"Shoulder",
-		_capsule(0.14, 0.36),
+		_capsule(0.165, 0.39),
 		skin,
 		Vector3(side * 0.035, 0.0, 0.0),
 		Vector3(0.0, 0.0, 90.0)
@@ -1205,7 +1361,7 @@ func _build_arm(
 	_add_part(
 		pivot,
 		"UpperArm",
-		_capsule(0.12, 0.48),
+		_capsule(0.145, 0.46),
 		skin_dark,
 		Vector3(0.0, -0.27, 0.0),
 		Vector3(2.0 * side, 0.0, 0.0)
@@ -1224,7 +1380,7 @@ func _build_arm(
 	_add_part(
 		pivot,
 		"ForeArm",
-		_capsule(0.105, 0.43),
+		_capsule(0.120, 0.40),
 		armor,
 		Vector3(0.0, -0.69, 0.035),
 		Vector3(-3.0, 0.0, 0.0)
@@ -1255,7 +1411,7 @@ func _build_arm(
 	_add_part(
 		pivot,
 		"Hand",
-		_capsule(0.085, 0.23),
+		_capsule(0.105, 0.245),
 		skin_dark,
 		Vector3(0.0, -0.92, 0.075),
 		Vector3(90.0, 0.0, 0.0),
@@ -1311,7 +1467,7 @@ func _build_leg(
 	_add_part(
 		pivot,
 		"Thigh",
-		_capsule(0.18, 0.57),
+		_capsule(0.215, 0.58),
 		skin,
 		Vector3(0.0, -0.29, 0.0),
 		Vector3(-3.0, 0.0, 0.0),
@@ -1331,7 +1487,7 @@ func _build_leg(
 	_add_part(
 		pivot,
 		"LowerLeg",
-		_capsule(0.135, 0.49),
+		_capsule(0.145, 0.45),
 		skin_dark,
 		Vector3(0.0, -0.79, 0.035),
 		Vector3(3.5, 0.0, 0.0)
@@ -1369,11 +1525,11 @@ func _build_leg(
 	_add_part(
 		pivot,
 		"Foot",
-		_capsule(0.115, 0.41),
+		_capsule(0.130, 0.36),
 		skin_dark,
 		Vector3(0.0, -1.07, 0.18),
 		Vector3(90.0, 0.0, 0.0),
-		Vector3(1.08, 1.0, 0.92)
+		Vector3(1.14, 1.04, 0.96)
 	)
 
 	# Pequeña protección superior.

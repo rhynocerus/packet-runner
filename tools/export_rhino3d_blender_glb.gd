@@ -5,11 +5,19 @@ const RHINO_SCENE := preload(
 )
 
 const OUTPUT_DIR := "res://exports/rhino3d"
-const OUTPUT_FILE := "res://exports/rhino3d/rhino3d-v0.9.1.glb"
+const OUTPUT_FILE := "res://exports/rhino3d/rhino3d-v0.9.1-blender.glb"
 
 
 func _init() -> void:
 	call_deferred("_export_rhino")
+
+
+func _force_all_visible(node: Node) -> void:
+	if node is Node3D:
+		(node as Node3D).visible = true
+
+	for child in node.get_children():
+		_force_all_visible(child)
 
 
 func _export_rhino() -> void:
@@ -23,6 +31,11 @@ func _export_rhino() -> void:
 
 	if rhino.has_method("set_running"):
 		rhino.set_running(false)
+
+	# Blender 4.5 aún no importa KHR_node_visibility.
+	# Para el archivo de modelado hacemos visibles
+	# temporalmente todas las piezas.
+	_force_all_visible(rhino)
 
 	await process_frame
 
