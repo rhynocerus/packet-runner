@@ -14,7 +14,7 @@ extends Node3D
 # - Menú / Información / Pausa
 
 const RHINO_SCENE: PackedScene = preload(
-	"res://scenes/3d/rhino/rhino_3d.tscn"
+	"res://scenes/3d/rhino/rhino_oscar_3d.tscn"
 )
 
 const MUSIC_LEVEL1: AudioStream = preload(
