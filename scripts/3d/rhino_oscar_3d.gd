@@ -9,6 +9,8 @@ const MODEL: PackedScene = preload(
 )
 
 const RUN_CYCLE_SPEED := 8.6
+const STEER_ANGLE := 55.0
+const STEER_RESPONSE := 9.0
 
 var model: Node3D
 
@@ -24,6 +26,11 @@ var elapsed := 0.0
 var run_cycle := 0.0
 
 var running := false
+var airborne := false
+
+var steering_target := 0.0
+var steering_current := 0.0
+
 var hero_pose_active := false
 var celebrate_remaining := 0.0
 
@@ -84,6 +91,11 @@ func _process(delta: float) -> void:
 	if hero_pose_active:
 		_process_hero_pose(delta)
 
+	_process_steering(delta)
+
+	if airborne:
+		_process_airborne(delta)
+
 
 func _find_node(
 	node_name: String
@@ -130,6 +142,113 @@ func _base_rotation(
 		node.get_instance_id(),
 		node.rotation
 	)
+
+
+func set_steering(
+	value: float
+) -> void:
+	steering_target = clampf(
+		value,
+		-1.0,
+		1.0
+	)
+
+
+func set_airborne(
+	value: bool
+) -> void:
+	airborne = value
+
+
+func _process_steering(
+	delta: float
+) -> void:
+	steering_current = lerpf(
+		steering_current,
+		steering_target,
+		clampf(
+			delta
+			* STEER_RESPONSE,
+			0.0,
+			1.0
+		)
+	)
+
+	if is_instance_valid(model):
+		model.rotation.y = deg_to_rad(
+			STEER_ANGLE
+			* steering_current
+		)
+
+
+func _process_airborne(
+	delta: float
+) -> void:
+	var blend: float = clampf(
+		delta * 10.0,
+		0.0,
+		1.0
+	)
+
+	if is_instance_valid(head_pivot):
+		var base := _base_rotation(
+			head_pivot
+		)
+
+		head_pivot.rotation.x = lerp_angle(
+			head_pivot.rotation.x,
+			base.x
+			+ deg_to_rad(-9.0),
+			blend
+		)
+
+	if is_instance_valid(arm_l):
+		var base := _base_rotation(
+			arm_l
+		)
+
+		arm_l.rotation.x = lerp_angle(
+			arm_l.rotation.x,
+			base.x
+			+ deg_to_rad(-20.0),
+			blend
+		)
+
+	if is_instance_valid(arm_r):
+		var base := _base_rotation(
+			arm_r
+		)
+
+		arm_r.rotation.x = lerp_angle(
+			arm_r.rotation.x,
+			base.x
+			+ deg_to_rad(-20.0),
+			blend
+		)
+
+	if is_instance_valid(leg_l):
+		var base := _base_rotation(
+			leg_l
+		)
+
+		leg_l.rotation.x = lerp_angle(
+			leg_l.rotation.x,
+			base.x
+			+ deg_to_rad(-24.0),
+			blend
+		)
+
+	if is_instance_valid(leg_r):
+		var base := _base_rotation(
+			leg_r
+		)
+
+		leg_r.rotation.x = lerp_angle(
+			leg_r.rotation.x,
+			base.x
+			+ deg_to_rad(-24.0),
+			blend
+		)
 
 
 func set_running(

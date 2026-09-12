@@ -1,7 +1,7 @@
 extends Node3D
 
 # Packet Runner 3D
-# Vertical Slice v0.7.1 // Cinematic Director Pass
+# Packet Runner 3D v0.8.1 // Wide Lanes + Jump Pass
 #
 # Primer prototipo jugable:
 # - Cyber-Savanna procedural
@@ -69,19 +69,23 @@ const BG := Color(0.015, 0.035, 0.060, 1.0)
 const ROAD := Color(0.035, 0.075, 0.085, 1.0)
 const SAVANNA := Color(0.11, 0.22, 0.13, 1.0)
 
-const TRACK_SPEED := 8.0
+const TRACK_SPEED := 9.2
 const TRACK_WRAP := 44.0
 const DECOR_SPEED := 2.7
 
 const PLAYER_Z := 2.1
-const LANE_CHANGE_SPEED := 6.5
+const LANE_CHANGE_SPEED := 7.0
 
 const FORWARD_MOVE_SPEED := 5.8
 const PLAYER_MIN_Z := -3.2
 const PLAYER_MAX_Z := 3.2
 
-const PLAYER_TURN_ANGLE := 12.0
+const PLAYER_TURN_ANGLE := 8.0
 const PLAYER_TURN_SPEED := 7.0
+
+const JUMP_VELOCITY := 6.8
+const JUMP_GRAVITY := 17.0
+const JUMP_MALWARE_CLEARANCE := 0.62
 
 const CAMERA_FOLLOW_SPEED := 2.6
 
@@ -93,7 +97,7 @@ const LEVEL_3_SCORE := 700
 
 const CINEMATIC_DURATION := 17.0
 
-const SPAWN_INTERVAL := 1.05
+const SPAWN_INTERVAL := 0.78
 
 const PACKET_SCORE := 10
 const SHIELD_PICKUP := 20
@@ -121,6 +125,9 @@ var horizon_sun_material: StandardMaterial3D
 
 var target_lane: int = 1
 var forward_input: float = 0.0
+
+var jump_velocity: float = 0.0
+var is_jumping: bool = false
 
 var lane_markers: Array[MeshInstance3D] = []
 var decorations: Array[Node3D] = []
@@ -239,6 +246,7 @@ func _process(delta: float) -> void:
 	_update_level_progression()
 
 	_handle_player_input()
+	_update_jump(delta)
 	_update_player(delta)
 	_update_camera(delta)
 
@@ -493,6 +501,32 @@ func _handle_player_input() -> void:
 			2
 		)
 
+	# Espacio / ui_accept.
+	# En INTRO sigue funcionando como skip;
+	# aquí sólo llegamos estando PLAYING.
+	if (
+		Input.is_action_just_pressed(
+			"ui_accept"
+		)
+		and not is_jumping
+	):
+		is_jumping = true
+		jump_velocity = JUMP_VELOCITY
+
+		if player.has_method(
+			"set_airborne"
+		):
+			player.call(
+				"set_airborne",
+				true
+			)
+
+		_show_event_feedback(
+			"↑ SALTO",
+			CYAN,
+			0.45
+		)
+
 	forward_input = 0.0
 
 	if (
@@ -508,11 +542,43 @@ func _handle_player_input() -> void:
 		forward_input += 1.0
 
 
+func _update_jump(delta: float) -> void:
+	if not is_jumping:
+		player.position.y = 0.0
+		return
+
+	jump_velocity -= (
+		JUMP_GRAVITY
+		* delta
+	)
+
+	player.position.y += (
+		jump_velocity
+		* delta
+	)
+
+	if player.position.y <= 0.0:
+		player.position.y = 0.0
+		jump_velocity = 0.0
+		is_jumping = false
+
+		if player.has_method(
+			"set_airborne"
+		):
+			player.call(
+				"set_airborne",
+				false
+			)
+
+
 func _update_player(delta: float) -> void:
-	var target_x: float = _lane_x(target_lane)
+	var target_x: float = _lane_x(
+		target_lane
+	)
 
 	var horizontal_error: float = (
-		target_x - player.position.x
+		target_x
+		- player.position.x
 	)
 
 	player.position.x = move_toward(
@@ -531,10 +597,10 @@ func _update_player(delta: float) -> void:
 		PLAYER_MAX_Z
 	)
 
-	# El Rino mira ligeramente hacia el carril
-	# al que está desplazándose.
+	# Movimiento físico del nodo principal:
+	# giro pequeño para conservar dirección de carrera.
 	var turn_factor: float = clampf(
-		horizontal_error / 1.6,
+		horizontal_error / 2.8,
 		-1.0,
 		1.0
 	)
@@ -552,9 +618,34 @@ func _update_player(delta: float) -> void:
 		desired_yaw,
 		minf(
 			1.0,
-			PLAYER_TURN_SPEED * delta
+			PLAYER_TURN_SPEED
+			* delta
 		)
 	)
+
+	# Giro VISUAL del modelo.
+	# Mantiene casi todo el 3/4 durante el cambio
+	# y sólo se endereza al acercarse al nuevo carril.
+	var visual_steer: float = 0.0
+
+	if absf(horizontal_error) > 0.08:
+		visual_steer = (
+			signf(horizontal_error)
+			* clampf(
+				absf(horizontal_error)
+				/ 0.48,
+				0.0,
+				1.0
+			)
+		)
+
+	if player.has_method(
+		"set_steering"
+	):
+		player.call(
+			"set_steering",
+			visual_steer
+		)
 
 
 func _update_camera(delta: float) -> void:
@@ -651,10 +742,10 @@ func _current_decor_speed() -> float:
 func _current_spawn_interval() -> float:
 	match current_level:
 		2:
-			return 0.90
+			return 0.70
 
 		3:
-			return 0.78
+			return 0.58
 
 	return SPAWN_INTERVAL
 
@@ -662,18 +753,16 @@ func _current_spawn_interval() -> float:
 func _lane_x(lane: int) -> float:
 	match lane:
 		0:
-			return -1.6
+			return -2.8
+
 		1:
 			return 0.0
+
 		2:
-			return 1.6
+			return 2.8
 
 	return 0.0
 
-
-# ============================================================
-# WORLD
-# ============================================================
 
 func _build_world() -> void:
 	_build_environment()
@@ -791,7 +880,7 @@ func _build_ground() -> void:
 	var road_plane := PlaneMesh.new()
 
 	road_plane.size = Vector2(
-		6.4,
+		9.6,
 		80.0
 	)
 
@@ -1140,7 +1229,7 @@ func _update_ground_details(
 			item.position.x = (
 				side
 				* rng.randf_range(
-					3.4,
+					5.0,
 					12.0
 				)
 			)
@@ -1177,8 +1266,8 @@ func _build_road_details() -> void:
 
 		root.position = Vector3(
 			rng.randf_range(
-				-2.55,
-				2.55
+				-4.20,
+				4.20
 			),
 			0.014,
 			4.0
@@ -1234,8 +1323,8 @@ func _update_road_details(delta: float) -> void:
 			item.position.z -= 50.0
 
 			item.position.x = rng.randf_range(
-				-2.55,
-				2.55
+				-4.20,
+				4.20
 			)
 
 			item.rotation.y = rng.randf_range(
@@ -1251,7 +1340,7 @@ func _build_track() -> void:
 	)
 
 	for i in range(22):
-		for divider_x in [-0.80, 0.80]:
+		for divider_x in [-1.40, 1.40]:
 			var marker := MeshInstance3D.new()
 			var box := BoxMesh.new()
 
@@ -1281,7 +1370,7 @@ func _build_edge_guides() -> void:
 	)
 
 	for i in range(22):
-		for side in [-3.02, 3.02]:
+		for side in [-4.65, 4.65]:
 			var guide := MeshInstance3D.new()
 			var box := BoxMesh.new()
 
@@ -2166,7 +2255,8 @@ func _update_pickups(delta: float) -> void:
 		var item: Node3D = pickups[i]
 
 		item.position.z += (
-			_current_track_speed() * delta
+			_current_track_speed()
+			* delta
 		)
 
 		item.rotation.y += (
@@ -2186,11 +2276,37 @@ func _update_pickups(delta: float) -> void:
 				item.position.x
 				- player.position.x
 			)
-			< 0.65
+			< 0.68
 		)
 
 		if close_z and close_x:
-			_collect_pickup(item)
+			var kind: String = str(
+				item.get_meta(
+					"kind",
+					"packet"
+				)
+			)
+
+			var malware_jumped: bool = (
+				kind == "malware"
+				and player.position.y
+				>= JUMP_MALWARE_CLEARANCE
+			)
+
+			if malware_jumped:
+				_show_event_feedback(
+					"↑ MALWARE SALTADO",
+					CYAN,
+					0.70
+				)
+
+				_set_status(
+					"EVASIÓN LIMPIA // MALWARE",
+					0.9
+				)
+
+			else:
+				_collect_pickup(item)
 
 			pickups.remove_at(i)
 			item.queue_free()
@@ -3270,7 +3386,7 @@ func _start_cinematic_intro() -> void:
 
 	camera.position = Vector3(
 		4.2,
-		2.55,
+		4.20,
 		-4.7
 	)
 
@@ -3567,7 +3683,7 @@ func _update_cinematic_intro(
 
 	var target_camera := Vector3(
 		4.2,
-		2.55,
+		4.20,
 		-4.7
 	)
 
@@ -3583,7 +3699,7 @@ func _update_cinematic_intro(
 					phase_t
 				),
 				lerpf(
-					2.55,
+					4.20,
 					2.15,
 					phase_t
 				),
@@ -3679,7 +3795,7 @@ func _update_cinematic_intro(
 			target_camera = Vector3(
 				lerpf(
 					-4.10,
-					2.55,
+					4.20,
 					phase_t
 				),
 				2.20
