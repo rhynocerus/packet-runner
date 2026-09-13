@@ -55,10 +55,10 @@ Rather than hiding the early prototype, the repository treats it as part of the 
 
 In Packet Runner, computer-network traffic becomes a living arcade ecosystem:
 
-- **Safe packets** represent healthy network circulation.
-- **Malware** represents infection and intrusion.
-- **Shield / firewall** represents system resilience.
-- **Boosts** represent temporary network acceleration.
+- **Safe packets** are healthy network traffic moving through the system.
+- **Malware** signals infection and intrusion.
+- **Shield / firewall** provides system resilience and protection.
+- **Boosts** deliver temporary network acceleration.
 - **The rhino** is the runner and guardian moving through the network landscape.
 
 The 3D world develops this idea as the **Cyber-Savanna**, where technology and nature share the same visual language.
