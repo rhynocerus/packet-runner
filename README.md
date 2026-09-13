@@ -6,7 +6,7 @@ Packet Runner is built with **Godot 4** and **GDScript** as a practical developm
 
 <p align="center">
   <a href="https://rhynocerus.github.io/packet-runner/"><img alt="Play Packet Runner 2D" src="https://img.shields.io/badge/PLAY-2D%20LEGACY-00BCD4?style=for-the-badge&logo=godotengine&logoColor=white"></a>
-  <a href="https://rhynocerus.github.io/packet-runner/3d/"><img alt="Play Packet Runner 3D" src="https://img.shields.io/badge/PLAY-3D%20WEB%20BUILD-00C896?style=for-the-badge&logo=godotengine&logoColor=white"></a>
+  <a href="https://rhynocerus.github.io/packet-runner/3d-v081/"><img alt="Play Packet Runner 3D" src="https://img.shields.io/badge/PLAY-3D%20WEB%20BUILD-00C896?style=for-the-badge&logo=godotengine&logoColor=white"></a>
 </p>
 
 <p align="center">
@@ -25,7 +25,7 @@ Packet Runner is **not split into separate repositories**. The 2D version is kep
 | Generation | Status | What it represents | Play |
 |---|---|---|---|
 | **Packet Runner 2D** | Legacy / playable | Original network-arcade prototype and the foundation of the project | [Play 2D](https://rhynocerus.github.io/packet-runner/) |
-| **Packet Runner 3D** | Active development | Cyber-Savanna runner, cinematic presentation, Rhino Oscar and expanded mechanics | [Play 3D](https://rhynocerus.github.io/packet-runner/3d/) |
+| **Packet Runner 3D** | Active development | Cyber-Savanna runner, cinematic presentation, Rhino Oscar and expanded mechanics | [Play 3D](https://rhynocerus.github.io/packet-runner/3d-v081/) |
 
 The web build can temporarily trail the newest development commit until the latest export is published to GitHub Pages. Tagged milestones remain reproducible from Git.
 
