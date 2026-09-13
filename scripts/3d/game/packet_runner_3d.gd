@@ -1,7 +1,7 @@
 extends Node3D
 
 # Packet Runner 3D
-# Packet Runner 3D v0.8.1 // Wide Lanes + Jump Pass
+# Packet Runner 3D v0.8.2 // Universal Controls Pass
 #
 # Primer prototipo jugable:
 # - Cyber-Savanna procedural
@@ -196,6 +196,12 @@ var intro_scan_passes: int = 0
 var pause_button: Button
 var game_over_score: Label
 
+var web_entry_overlay: ColorRect
+var web_entry_pending: bool = false
+
+var touch_controls: Control
+var touch_controls_enabled: bool = false
+
 
 func _ready() -> void:
 	rng.randomize()
@@ -205,17 +211,28 @@ func _ready() -> void:
 	_build_audio()
 	_build_ui()
 
-	_show_brand_splash()
+	if OS.has_feature("web"):
+		_show_web_entry_gate()
+	else:
+		_show_brand_splash()
 
-	await get_tree().create_timer(
-		2.8
-	).timeout
+		await get_tree().create_timer(
+			2.8
+		).timeout
 
-	_start_cinematic_intro()
+		_start_cinematic_intro()
 
 
 func _process(delta: float) -> void:
 	_update_ui_motion(delta)
+
+	if web_entry_pending:
+		if Input.is_action_just_pressed(
+			"ui_accept"
+		):
+			_enter_web_game()
+
+		return
 
 	if game_state == GameState.INTRO:
 		if (
@@ -307,6 +324,8 @@ func _start_game() -> void:
 	pause_button.show()
 	pause_button.text = "PAUSA"
 
+	_set_touch_controls_visible(true)
+
 	_set_status(
 		"FIREWALL: ESTABLE",
 		0.0
@@ -340,6 +359,8 @@ func _show_menu() -> void:
 
 	hud.hide()
 	pause_button.hide()
+
+	_set_touch_controls_visible(false)
 
 	player.visible = true
 
@@ -380,6 +401,8 @@ func _toggle_pause() -> void:
 		game_state = GameState.PAUSED
 		pause_button.text = "CONTINUAR"
 
+		_set_touch_controls_visible(false)
+
 		if is_instance_valid(music_player):
 			music_player.stream_paused = true
 
@@ -391,6 +414,8 @@ func _toggle_pause() -> void:
 	elif game_state == GameState.PAUSED:
 		game_state = GameState.PLAYING
 		pause_button.text = "PAUSA"
+
+		_set_touch_controls_visible(true)
 
 		if is_instance_valid(music_player):
 			music_player.stream_paused = false
@@ -423,6 +448,8 @@ func _game_over() -> void:
 
 	game_over_overlay.show()
 	pause_button.hide()
+
+	_set_touch_controls_visible(false)
 
 	firewall_label.text = (
 		"⚠ FIREWALL COMPROMETIDO"
@@ -502,30 +529,11 @@ func _handle_player_input() -> void:
 		)
 
 	# Espacio / ui_accept.
-	# En INTRO sigue funcionando como skip;
-	# aquí sólo llegamos estando PLAYING.
-	if (
-		Input.is_action_just_pressed(
-			"ui_accept"
-		)
-		and not is_jumping
+	# Touch usa la misma función.
+	if Input.is_action_just_pressed(
+		"ui_accept"
 	):
-		is_jumping = true
-		jump_velocity = JUMP_VELOCITY
-
-		if player.has_method(
-			"set_airborne"
-		):
-			player.call(
-				"set_airborne",
-				true
-			)
-
-		_show_event_feedback(
-			"↑ SALTO",
-			CYAN,
-			0.45
-		)
+		_begin_jump()
 
 	forward_input = 0.0
 
@@ -2779,11 +2787,13 @@ func _build_ui() -> void:
 	ui_root.theme = ui_theme
 
 	_build_brand_splash()
+	_build_web_entry_gate()
 	_build_cinematic_overlay()
 	_build_hud()
 	_build_menu()
 	_build_info()
 	_build_game_over()
+	_build_touch_controls()
 	_build_ui_motion_fx()
 
 
@@ -3109,6 +3119,366 @@ func _show_brand_splash() -> void:
 	brand_overlay.show()
 
 
+
+# ============================================================
+# WEB ENTRY / AUDIO UNLOCK
+# ============================================================
+
+func _build_web_entry_gate() -> void:
+	web_entry_overlay = ColorRect.new()
+
+	web_entry_overlay.name = "WebEntryGate"
+	web_entry_overlay.color = Color(
+		0.004,
+		0.016,
+		0.026,
+		1.0
+	)
+
+	web_entry_overlay.set_anchors_and_offsets_preset(
+		Control.PRESET_FULL_RECT
+	)
+
+	ui_root.add_child(web_entry_overlay)
+
+	var center := CenterContainer.new()
+
+	center.set_anchors_and_offsets_preset(
+		Control.PRESET_FULL_RECT
+	)
+
+	web_entry_overlay.add_child(center)
+
+	var box := VBoxContainer.new()
+
+	box.custom_minimum_size = Vector2(
+		520.0,
+		250.0
+	)
+
+	box.alignment = (
+		BoxContainer.ALIGNMENT_CENTER
+	)
+
+	center.add_child(box)
+
+	var title := Label.new()
+
+	title.text = "PACKET RUNNER 3D"
+	title.horizontal_alignment = (
+		HORIZONTAL_ALIGNMENT_CENTER
+	)
+
+	_style_title(title)
+
+	title.add_theme_font_size_override(
+		"font_size",
+		34
+	)
+
+	title.add_theme_color_override(
+		"font_color",
+		CYAN
+	)
+
+	box.add_child(title)
+
+	var subtitle := Label.new()
+
+	subtitle.text = (
+		"CYBER-SAVANNA // RHINO OSCAR ONLINE"
+	)
+
+	subtitle.horizontal_alignment = (
+		HORIZONTAL_ALIGNMENT_CENTER
+	)
+
+	_style_telemetry(subtitle)
+
+	subtitle.add_theme_font_size_override(
+		"font_size",
+		15
+	)
+
+	subtitle.add_theme_color_override(
+		"font_color",
+		GREEN
+	)
+
+	box.add_child(subtitle)
+
+	var spacer := Control.new()
+	spacer.custom_minimum_size.y = 26.0
+	box.add_child(spacer)
+
+	var enter_button := Button.new()
+
+	enter_button.text = (
+		"TOCA / CLICK / ENTER PARA ENTRAR"
+	)
+
+	enter_button.custom_minimum_size = Vector2(
+		420.0,
+		64.0
+	)
+
+	enter_button.focus_mode = (
+		Control.FOCUS_ALL
+	)
+
+	_style_button(enter_button)
+
+	enter_button.add_theme_font_size_override(
+		"font_size",
+		18
+	)
+
+	enter_button.pressed.connect(
+		_enter_web_game
+	)
+
+	box.add_child(enter_button)
+
+	var audio_hint := Label.new()
+
+	audio_hint.text = (
+		"Activa audio e inicia la secuencia"
+	)
+
+	audio_hint.horizontal_alignment = (
+		HORIZONTAL_ALIGNMENT_CENTER
+	)
+
+	_style_telemetry(audio_hint)
+
+	audio_hint.add_theme_font_size_override(
+		"font_size",
+		12
+	)
+
+	audio_hint.add_theme_color_override(
+		"font_color",
+		Color(
+			0.48,
+			0.72,
+			0.76,
+			1.0
+		)
+	)
+
+	box.add_child(audio_hint)
+
+	web_entry_overlay.hide()
+
+
+func _show_web_entry_gate() -> void:
+	web_entry_pending = true
+
+	menu_overlay.hide()
+	info_overlay.hide()
+	game_over_overlay.hide()
+	cinematic_overlay.hide()
+
+	hud.hide()
+	pause_button.hide()
+
+	_set_touch_controls_visible(false)
+
+	if is_instance_valid(brand_overlay):
+		brand_overlay.hide()
+
+	web_entry_overlay.show()
+	web_entry_overlay.move_to_front()
+
+
+func _enter_web_game() -> void:
+	if not web_entry_pending:
+		return
+
+	web_entry_pending = false
+
+	if is_instance_valid(web_entry_overlay):
+		web_entry_overlay.hide()
+
+	_start_cinematic_intro()
+
+
+# ============================================================
+# UNIVERSAL TOUCH CONTROLS
+# ============================================================
+
+func _build_touch_controls() -> void:
+	touch_controls = Control.new()
+
+	touch_controls.name = "TouchControls"
+
+	touch_controls.set_anchors_and_offsets_preset(
+		Control.PRESET_FULL_RECT
+	)
+
+	touch_controls.mouse_filter = (
+		Control.MOUSE_FILTER_IGNORE
+	)
+
+	ui_root.add_child(touch_controls)
+
+	touch_controls_enabled = (
+		DisplayServer.is_touchscreen_available()
+	)
+
+	var left_button := Button.new()
+
+	left_button.text = "◀"
+	left_button.focus_mode = (
+		Control.FOCUS_NONE
+	)
+
+	left_button.set_anchors_preset(
+		Control.PRESET_BOTTOM_LEFT
+	)
+
+	left_button.offset_left = 24.0
+	left_button.offset_top = -112.0
+	left_button.offset_right = 116.0
+	left_button.offset_bottom = -28.0
+
+	_style_button(left_button)
+
+	left_button.add_theme_font_size_override(
+		"font_size",
+		30
+	)
+
+	left_button.pressed.connect(
+		_touch_left
+	)
+
+	touch_controls.add_child(left_button)
+
+	var right_button := Button.new()
+
+	right_button.text = "▶"
+	right_button.focus_mode = (
+		Control.FOCUS_NONE
+	)
+
+	right_button.set_anchors_preset(
+		Control.PRESET_BOTTOM_LEFT
+	)
+
+	right_button.offset_left = 132.0
+	right_button.offset_top = -112.0
+	right_button.offset_right = 224.0
+	right_button.offset_bottom = -28.0
+
+	_style_button(right_button)
+
+	right_button.add_theme_font_size_override(
+		"font_size",
+		30
+	)
+
+	right_button.pressed.connect(
+		_touch_right
+	)
+
+	touch_controls.add_child(right_button)
+
+	var jump_button := Button.new()
+
+	jump_button.text = "JUMP"
+	jump_button.focus_mode = (
+		Control.FOCUS_NONE
+	)
+
+	jump_button.set_anchors_preset(
+		Control.PRESET_BOTTOM_RIGHT
+	)
+
+	jump_button.offset_left = -170.0
+	jump_button.offset_top = -116.0
+	jump_button.offset_right = -24.0
+	jump_button.offset_bottom = -28.0
+
+	_style_button(jump_button)
+
+	jump_button.add_theme_font_size_override(
+		"font_size",
+		22
+	)
+
+	jump_button.pressed.connect(
+		_touch_jump
+	)
+
+	touch_controls.add_child(jump_button)
+
+	touch_controls.hide()
+
+
+func _set_touch_controls_visible(
+	visible_requested: bool
+) -> void:
+	if not is_instance_valid(touch_controls):
+		return
+
+	touch_controls.visible = (
+		visible_requested
+		and touch_controls_enabled
+	)
+
+
+func _touch_left() -> void:
+	if game_state != GameState.PLAYING:
+		return
+
+	target_lane = clampi(
+		target_lane - 1,
+		0,
+		2
+	)
+
+
+func _touch_right() -> void:
+	if game_state != GameState.PLAYING:
+		return
+
+	target_lane = clampi(
+		target_lane + 1,
+		0,
+		2
+	)
+
+
+func _touch_jump() -> void:
+	if game_state != GameState.PLAYING:
+		return
+
+	_begin_jump()
+
+
+func _begin_jump() -> void:
+	if is_jumping:
+		return
+
+	is_jumping = true
+	jump_velocity = JUMP_VELOCITY
+
+	if player.has_method(
+		"set_airborne"
+	):
+		player.call(
+			"set_airborne",
+			true
+		)
+
+	_show_event_feedback(
+		"↑ SALTO",
+		CYAN,
+		0.45
+	)
+
+
 # ============================================================
 # CINEMATIC INTRO
 # ============================================================
@@ -3345,6 +3715,13 @@ func _build_cinematic_overlay() -> void:
 
 func _start_cinematic_intro() -> void:
 	game_state = GameState.INTRO
+
+	web_entry_pending = false
+
+	if is_instance_valid(web_entry_overlay):
+		web_entry_overlay.hide()
+
+	_set_touch_controls_visible(false)
 
 	cinematic_elapsed = 0.0
 	cinematic_phase = -1
