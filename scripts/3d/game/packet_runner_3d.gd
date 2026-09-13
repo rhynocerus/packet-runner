@@ -87,6 +87,14 @@ const JUMP_VELOCITY := 6.8
 const JUMP_GRAVITY := 17.0
 const JUMP_MALWARE_CLEARANCE := 0.62
 
+const TOUCH_SWIPE_THRESHOLD := 52.0
+const TOUCH_VERTICAL_RANGE := 140.0
+
+const GAMEPAD_DEADZONE := 0.22
+const GAMEPAD_LANE_THRESHOLD := 0.62
+
+const LANE_ACTION_COOLDOWN_MS := 100
+
 const CAMERA_FOLLOW_SPEED := 2.6
 
 const BOOST_DURATION := 5.0
@@ -202,6 +210,15 @@ var web_entry_pending: bool = false
 var touch_controls: Control
 var touch_controls_enabled: bool = false
 
+var touch_nav_active: bool = false
+var touch_nav_index: int = -1
+var touch_nav_anchor := Vector2.ZERO
+var touch_forward_input: float = 0.0
+
+var gamepad_lane_latched: bool = false
+
+var last_lane_action_msec: int = -1000
+
 
 func _ready() -> void:
 	rng.randomize()
@@ -221,6 +238,52 @@ func _ready() -> void:
 		).timeout
 
 		_start_cinematic_intro()
+
+
+func _input(event: InputEvent) -> void:
+	# --------------------------------------------------------
+	# GAMEPAD / MANDOS
+	# --------------------------------------------------------
+
+	if event is InputEventJoypadButton:
+		_handle_gamepad_button(
+			event as InputEventJoypadButton
+		)
+
+	# --------------------------------------------------------
+	# WEB ENTRY
+	# Un toque real desbloquea también el audio del navegador.
+	# --------------------------------------------------------
+
+	if web_entry_pending:
+		if event is InputEventScreenTouch:
+			var entry_touch := (
+				event as InputEventScreenTouch
+			)
+
+			if entry_touch.pressed:
+				_enter_web_game()
+
+				get_viewport().set_input_as_handled()
+
+		return
+
+	# --------------------------------------------------------
+	# TOUCH DE JUEGO
+	# --------------------------------------------------------
+
+	if game_state != GameState.PLAYING:
+		return
+
+	if event is InputEventScreenTouch:
+		_handle_touch_press(
+			event as InputEventScreenTouch
+		)
+
+	elif event is InputEventScreenDrag:
+		_handle_touch_drag(
+			event as InputEventScreenDrag
+		)
 
 
 func _process(delta: float) -> void:
@@ -515,18 +578,10 @@ func _build_player() -> void:
 
 func _handle_player_input() -> void:
 	if Input.is_action_just_pressed("ui_left"):
-		target_lane = clampi(
-			target_lane - 1,
-			0,
-			2
-		)
+		_touch_left()
 
 	if Input.is_action_just_pressed("ui_right"):
-		target_lane = clampi(
-			target_lane + 1,
-			0,
-			2
-		)
+		_touch_right()
 
 	# Espacio / ui_accept.
 	# Touch usa la misma función.
@@ -548,6 +603,18 @@ func _handle_player_input() -> void:
 		or Input.is_action_pressed("ui_down")
 	):
 		forward_input += 1.0
+
+	# Seguimiento vertical táctil.
+	forward_input += touch_forward_input
+
+	# Stick analógico / mando.
+	_handle_gamepad_axes()
+
+	forward_input = clampf(
+		forward_input,
+		-1.0,
+		1.0
+	)
 
 
 func _update_jump(delta: float) -> void:
@@ -3328,7 +3395,7 @@ func _build_touch_controls() -> void:
 
 	var left_button := Button.new()
 
-	left_button.text = "◀"
+	left_button.text = "LEFT"
 	left_button.focus_mode = (
 		Control.FOCUS_NONE
 	)
@@ -3357,7 +3424,7 @@ func _build_touch_controls() -> void:
 
 	var right_button := Button.new()
 
-	right_button.text = "▶"
+	right_button.text = "RIGHT"
 	right_button.focus_mode = (
 		Control.FOCUS_NONE
 	)
@@ -3422,32 +3489,248 @@ func _set_touch_controls_visible(
 	if not is_instance_valid(touch_controls):
 		return
 
+	if not visible_requested:
+		touch_nav_active = false
+		touch_nav_index = -1
+		touch_forward_input = 0.0
+
 	touch_controls.visible = (
 		visible_requested
 		and touch_controls_enabled
 	)
 
 
-func _touch_left() -> void:
+func _handle_touch_press(
+	touch_event: InputEventScreenTouch
+) -> void:
+	if touch_event.pressed:
+		var viewport_size := (
+			get_viewport()
+			.get_visible_rect()
+			.size
+		)
+
+		var pos := touch_event.position
+
+		var bottom_controls: bool = (
+			pos.y
+			>= viewport_size.y * 0.70
+		)
+
+		# JUMP: esquina inferior derecha.
+		if (
+			bottom_controls
+			and pos.x
+			>= viewport_size.x * 0.78
+		):
+			_begin_jump()
+
+			get_viewport().set_input_as_handled()
+			return
+
+		# LEFT: esquina inferior izquierda.
+		if (
+			bottom_controls
+			and pos.x
+			<= viewport_size.x * 0.105
+		):
+			_touch_left()
+
+			get_viewport().set_input_as_handled()
+			return
+
+		# RIGHT: segundo botón inferior.
+		if (
+			bottom_controls
+			and pos.x
+			<= viewport_size.x * 0.215
+		):
+			_touch_right()
+
+			get_viewport().set_input_as_handled()
+			return
+
+		# En cualquier otra parte de la pantalla,
+		# comenzamos seguimiento tipo Packet Runner 2D.
+		if touch_nav_index == -1:
+			touch_nav_active = true
+			touch_nav_index = touch_event.index
+			touch_nav_anchor = pos
+			touch_forward_input = 0.0
+
+	else:
+		if touch_event.index == touch_nav_index:
+			touch_nav_active = false
+			touch_nav_index = -1
+			touch_forward_input = 0.0
+
+			get_viewport().set_input_as_handled()
+
+
+func _handle_touch_drag(
+	drag_event: InputEventScreenDrag
+) -> void:
+	if (
+		not touch_nav_active
+		or drag_event.index != touch_nav_index
+	):
+		return
+
+	var drag_delta := (
+		drag_event.position
+		- touch_nav_anchor
+	)
+
+	var abs_x := absf(drag_delta.x)
+	var abs_y := absf(drag_delta.y)
+
+	# Swipe horizontal:
+	# cada gesto mueve un carril.
+	if (
+		abs_x >= TOUCH_SWIPE_THRESHOLD
+		and abs_x > abs_y * 1.10
+	):
+		if drag_delta.x < 0.0:
+			_touch_left()
+		else:
+			_touch_right()
+
+		touch_nav_anchor = drag_event.position
+		touch_forward_input = 0.0
+
+		get_viewport().set_input_as_handled()
+		return
+
+	# Arrastre vertical:
+	# arriba = W / avanzar
+	# abajo  = S / retroceder.
+	if abs_y > 10.0:
+		touch_forward_input = clampf(
+			drag_delta.y
+			/ TOUCH_VERTICAL_RANGE,
+			-1.0,
+			1.0
+		)
+	else:
+		touch_forward_input = 0.0
+
+	get_viewport().set_input_as_handled()
+
+
+func _handle_gamepad_button(
+	joy_event: InputEventJoypadButton
+) -> void:
+	if not joy_event.pressed:
+		return
+
+	var button := joy_event.button_index
+
+	# START sirve como entrada / skip / pausa.
+	if button == JOY_BUTTON_START:
+		if web_entry_pending:
+			_enter_web_game()
+
+		elif game_state == GameState.INTRO:
+			_finish_cinematic_intro()
+
+		elif (
+			game_state == GameState.PLAYING
+			or game_state == GameState.PAUSED
+		):
+			_toggle_pause()
+
+		return
+
+	# A / X / hombro derecho = salto.
+	if button in [
+		JOY_BUTTON_A,
+		JOY_BUTTON_X,
+		JOY_BUTTON_RIGHT_SHOULDER
+	]:
+		if web_entry_pending:
+			_enter_web_game()
+
+		elif game_state == GameState.INTRO:
+			_finish_cinematic_intro()
+
+		elif game_state == GameState.PLAYING:
+			_begin_jump()
+
+		return
+
 	if game_state != GameState.PLAYING:
 		return
 
+	# Cruceta.
+	if button == JOY_BUTTON_DPAD_LEFT:
+		_touch_left()
+
+	elif button == JOY_BUTTON_DPAD_RIGHT:
+		_touch_right()
+
+
+func _handle_gamepad_axes() -> void:
+	var joypads := Input.get_connected_joypads()
+
+	if joypads.is_empty():
+		gamepad_lane_latched = false
+		return
+
+	var joy_id: int = joypads[0]
+
+	var lane_axis: float = Input.get_joy_axis(
+		joy_id,
+		JOY_AXIS_LEFT_X
+	)
+
+	if absf(lane_axis) <= GAMEPAD_DEADZONE:
+		gamepad_lane_latched = false
+
+	elif not gamepad_lane_latched:
+		if lane_axis <= -GAMEPAD_LANE_THRESHOLD:
+			_touch_left()
+			gamepad_lane_latched = true
+
+		elif lane_axis >= GAMEPAD_LANE_THRESHOLD:
+			_touch_right()
+			gamepad_lane_latched = true
+
+	var depth_axis: float = Input.get_joy_axis(
+		joy_id,
+		JOY_AXIS_LEFT_Y
+	)
+
+	if absf(depth_axis) > GAMEPAD_DEADZONE:
+		forward_input += depth_axis
+
+
+func _shift_lane(step: int) -> void:
+	if game_state != GameState.PLAYING:
+		return
+
+	var now_msec: int = Time.get_ticks_msec()
+
+	if (
+		now_msec - last_lane_action_msec
+		< LANE_ACTION_COOLDOWN_MS
+	):
+		return
+
 	target_lane = clampi(
-		target_lane - 1,
+		target_lane + step,
 		0,
 		2
 	)
+
+	last_lane_action_msec = now_msec
+
+
+func _touch_left() -> void:
+	_shift_lane(-1)
 
 
 func _touch_right() -> void:
-	if game_state != GameState.PLAYING:
-		return
-
-	target_lane = clampi(
-		target_lane + 1,
-		0,
-		2
-	)
+	_shift_lane(1)
 
 
 func _touch_jump() -> void:
