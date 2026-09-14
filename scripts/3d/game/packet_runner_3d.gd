@@ -1,7 +1,7 @@
 extends Node3D
 
 # Packet Runner 3D
-# Packet Runner 3D v0.8.2 // Universal Controls Pass
+# Packet Runner 3D v0.8.3 // Celebration + Visual Depth Pass
 #
 # Primer prototipo jugable:
 # - Cyber-Savanna procedural
@@ -95,6 +95,9 @@ const GAMEPAD_LANE_THRESHOLD := 0.62
 
 const LANE_ACTION_COOLDOWN_MS := 100
 
+const XR_STICK_DEADZONE := 0.22
+const XR_LANE_THRESHOLD := 0.62
+
 const CAMERA_FOLLOW_SPEED := 2.6
 
 const BOOST_DURATION := 5.0
@@ -126,6 +129,12 @@ var camera: Camera3D
 
 var world_environment: Environment
 var main_sun_light: DirectionalLight3D
+
+var sky_material: ProceduralSkyMaterial
+var sky_resource: Sky
+
+var cloud_material: StandardMaterial3D
+var cloud_layers: Array[Node3D] = []
 
 var savanna_material: StandardMaterial3D
 var road_material: StandardMaterial3D
@@ -219,6 +228,20 @@ var gamepad_lane_latched: bool = false
 
 var last_lane_action_msec: int = -1000
 
+var webxr_interface: WebXRInterface
+var webxr_supported: bool = false
+var webxr_request_pending: bool = false
+var xr_mode_active: bool = false
+
+var webxr_button: Button
+
+var xr_origin: XROrigin3D
+var xr_camera: XRCamera3D
+var xr_left_controller: XRController3D
+var xr_right_controller: XRController3D
+
+var xr_lane_latched: bool = false
+
 
 func _ready() -> void:
 	rng.randomize()
@@ -227,16 +250,16 @@ func _ready() -> void:
 	_build_player()
 	_build_audio()
 	_build_ui()
+	_setup_webxr()
 
 	if OS.has_feature("web"):
+		# Web:
+		# loader RHYNUS -> gate de entrada -> intro.
 		_show_web_entry_gate()
 	else:
-		_show_brand_splash()
-
-		await get_tree().create_timer(
-			2.8
-		).timeout
-
+		# Nativo:
+		# el boot splash de Godot ya mostró RHYNUS.
+		# Evitamos repetir el logo dentro del juego.
 		_start_cinematic_intro()
 
 
@@ -334,6 +357,7 @@ func _process(delta: float) -> void:
 	_update_ground_details(delta)
 	_update_road_details(delta)
 	_update_decorations(delta)
+	_update_clouds(delta)
 
 	_update_pickups(delta)
 	_update_spawning(delta)
@@ -610,6 +634,9 @@ func _handle_player_input() -> void:
 	# Stick analógico / mando.
 	_handle_gamepad_axes()
 
+	# Meta Quest / WebXR.
+	_handle_xr_axes()
+
 	forward_input = clampf(
 		forward_input,
 		-1.0,
@@ -727,28 +754,83 @@ func _update_camera(delta: float) -> void:
 	if not is_instance_valid(camera):
 		return
 
-	var target_camera_y: float = 3.45
-	var target_camera_z: float = 7.20
-	var target_fov: float = 70.0
-	var look_ahead: float = -4.5
+	# En Quest/WebXR manda exclusivamente la cabeza.
+	# Nada de cámara artificial aplicada al HMD.
+	if xr_mode_active:
+		return
+
+	var level_factor: float = float(
+		current_level - 1
+	)
+
+	# Respiración cinematográfica bastante más visible.
+	# Seguimos SIN roll para mantener comodidad.
+	var cinematic_sway: float = (
+		sin(
+			ui_motion_elapsed * 0.92
+		)
+		* 0.30
+	)
+
+	var lane_error: float = (
+		_lane_x(target_lane)
+		- player.position.x
+	)
+
+	# Cámara anticipa de verdad el cambio de carril.
+	var target_camera_x: float = (
+		player.position.x * 0.50
+		+ clampf(
+			lane_error * 0.38,
+			-0.65,
+			0.65
+		)
+		+ cinematic_sway
+	)
+
+	# Más acompañamiento vertical durante el salto.
+	var target_camera_y: float = (
+		3.45
+		+ level_factor * 0.18
+		+ player.position.y * 0.36
+	)
+
+	# Cada nivel acerca la acción.
+	var target_camera_z: float = (
+		7.20
+		- level_factor * 0.52
+	)
+
+	var target_fov: float = (
+		70.0
+		+ level_factor * 4.0
+	)
+
+	var look_ahead: float = (
+		-4.5
+		- level_factor * 1.10
+	)
 
 	if boost_remaining > 0.0:
-		# Durante el boost nos acercamos al Rino
-		# y abrimos ligeramente el campo visual.
-		target_camera_y = 3.00
-		target_camera_z = 6.00
-		target_fov = 75.0
-		look_ahead = -6.0
+		# Boost con cambio evidente de encuadre.
+		target_camera_y = (
+			2.72
+			+ player.position.y * 0.24
+		)
+
+		target_camera_z = 5.15
+		target_fov = 82.0
+		look_ahead = -7.6
 
 	var blend: float = clampf(
-		delta * 2.5,
+		delta * 3.5,
 		0.0,
 		1.0
 	)
 
 	camera.position.x = lerpf(
 		camera.position.x,
-		player.position.x * 0.18,
+		target_camera_x,
 		blend
 	)
 
@@ -772,9 +854,12 @@ func _update_camera(delta: float) -> void:
 
 	camera.look_at(
 		Vector3(
-			player.position.x * 0.12,
-			1.15,
-			player.position.z + look_ahead
+			player.position.x * 0.30
+			+ cinematic_sway * 0.65,
+			1.15
+			+ player.position.y * 0.18,
+			player.position.z
+			+ look_ahead
 		),
 		Vector3.UP
 	)
@@ -847,6 +932,7 @@ func _build_world() -> void:
 	_build_track()
 	_build_edge_guides()
 	_build_horizon()
+	_build_clouds()
 	_build_decorations()
 
 
@@ -856,9 +942,50 @@ func _build_environment() -> void:
 	world_environment = Environment.new()
 
 	world_environment.background_mode = (
-		Environment.BG_COLOR
+		Environment.BG_SKY
 	)
 
+	# --------------------------------------------------------
+	# Cielo procedural.
+	# No usa texturas externas: prácticamente cero peso extra.
+	# --------------------------------------------------------
+
+	sky_material = ProceduralSkyMaterial.new()
+
+	sky_material.sky_top_color = Color(
+		0.055,
+		0.19,
+		0.34,
+		1.0
+	)
+
+	sky_material.sky_horizon_color = Color(
+		0.60,
+		0.52,
+		0.34,
+		1.0
+	)
+
+	sky_material.ground_horizon_color = Color(
+		0.16,
+		0.25,
+		0.18,
+		1.0
+	)
+
+	sky_material.ground_bottom_color = Color(
+		0.025,
+		0.055,
+		0.040,
+		1.0
+	)
+
+	sky_resource = Sky.new()
+	sky_resource.sky_material = sky_material
+
+	world_environment.sky = sky_resource
+
+	# Fallback de color.
 	world_environment.background_color = BG
 
 	world_environment.ambient_light_source = (
@@ -1555,6 +1682,214 @@ func _build_horizon() -> void:
 		add_child(mountain)
 
 
+func _build_clouds() -> void:
+	cloud_material = _make_material(
+		Color(
+			0.86,
+			0.92,
+			0.97,
+			1.0
+		),
+		Color(
+			0.035,
+			0.055,
+			0.070,
+			1.0
+		)
+	)
+
+	cloud_layers.clear()
+
+	for cloud_index in range(10):
+		var root := Node3D.new()
+
+		root.name = (
+			"CyberCloud%02d"
+			% cloud_index
+		)
+
+		var band := float(
+			cloud_index % 5
+		)
+
+		var row := float(
+			cloud_index / 5
+		)
+
+		root.position = Vector3(
+			-13.0
+			+ band * 6.2
+			+ rng.randf_range(-1.4, 1.4),
+			4.7
+			+ row * 2.1
+			+ rng.randf_range(-0.45, 0.75),
+			-9.0
+			- row * 10.0
+			- rng.randf_range(0.0, 8.0)
+		)
+
+		root.rotation.y = rng.randf_range(
+			-0.25,
+			0.25
+		)
+
+		var cloud_scale := rng.randf_range(
+			1.35,
+			2.35
+		)
+
+		root.scale = Vector3.ONE * cloud_scale
+
+		add_child(root)
+		cloud_layers.append(root)
+
+		for puff_index in range(5):
+			var puff := MeshInstance3D.new()
+			var mesh := SphereMesh.new()
+
+			mesh.radius = 0.90
+			mesh.height = 1.80
+			mesh.radial_segments = 10
+			mesh.rings = 5
+
+			puff.mesh = mesh
+
+			var lateral := float(
+				puff_index - 2
+			)
+
+			puff.position = Vector3(
+				lateral * 0.86,
+				0.16
+				+ sin(
+					float(puff_index) * 1.65
+				) * 0.24,
+				cos(
+					float(puff_index) * 1.17
+				) * 0.34
+			)
+
+			var puff_size := (
+				0.78
+				+ rng.randf_range(0.0, 0.42)
+			)
+
+			puff.scale = Vector3(
+				puff_size * 1.35,
+				puff_size * 0.52,
+				puff_size
+			)
+
+			puff.material_override = cloud_material
+
+			puff.cast_shadow = (
+				GeometryInstance3D
+				.SHADOW_CASTING_SETTING_OFF
+			)
+
+			root.add_child(puff)
+
+
+func _update_clouds(delta: float) -> void:
+	if cloud_material == null:
+		return
+
+	var target_cloud := Color(
+		0.86,
+		0.92,
+		0.97,
+		1.0
+	)
+
+	match current_level:
+		2:
+			target_cloud = Color(
+				0.96,
+				0.70,
+				0.49,
+				1.0
+			)
+
+		3:
+			target_cloud = Color(
+				0.48,
+				0.62,
+				0.88,
+				1.0
+			)
+
+	cloud_material.albedo_color = (
+		cloud_material.albedo_color.lerp(
+			target_cloud,
+			clampf(
+				delta * 0.75,
+				0.0,
+				1.0
+			)
+		)
+	)
+
+	var cloud_time := (
+		float(Time.get_ticks_msec())
+		* 0.001
+	)
+
+	for i in range(cloud_layers.size()):
+		var cloud: Node3D = cloud_layers[i]
+
+		if not is_instance_valid(cloud):
+			continue
+
+		var drift := (
+			0.22
+			+ float(i % 4) * 0.045
+		)
+
+		cloud.position.x += (
+			delta * drift
+		)
+
+		cloud.position.y += (
+			sin(
+				cloud_time * 0.20
+				+ float(i) * 1.37
+			)
+			* delta
+			* 0.025
+		)
+
+		cloud.rotation.y += (
+			delta
+			* (
+				0.006
+				+ float(i % 3) * 0.002
+			)
+		)
+
+		if cloud.position.x > 17.0:
+			cloud.position.x = -17.0
+
+			cloud.position.y = rng.randf_range(
+				4.8,
+				9.4
+			)
+
+			cloud.position.z = rng.randf_range(
+				-28.0,
+				-9.0
+			)
+
+			var cloud_scale := rng.randf_range(
+				1.35,
+				2.35
+			)
+
+			cloud.scale = (
+				Vector3.ONE
+				* cloud_scale
+			)
+
+
 func _build_decorations() -> void:
 	# Ya no repetimos secuencias fijas.
 	# Cada lateral recibe una combinación distinta
@@ -2213,31 +2548,41 @@ func _build_pickup_visual(
 		)
 
 	elif kind == "shield":
-		var shield_mesh := BoxMesh.new()
+		# Escudo hexagonal de red.
+		# Cilindro de 6 lados orientado hacia el jugador.
+		var shield_mesh := CylinderMesh.new()
 
-		shield_mesh.size = Vector3(
-			0.48,
-			0.48,
-			0.20
-		)
+		shield_mesh.top_radius = 0.35
+		shield_mesh.bottom_radius = 0.35
+		shield_mesh.height = 0.12
+		shield_mesh.radial_segments = 6
 
 		mesh_resource = shield_mesh
 
 		material = _make_material(
 			Color(
-				0.0,
-				0.42,
-				0.52,
+				0.015,
+				0.30,
+				0.38,
 				1.0
 			),
-			CYAN
+			Color(
+				0.0,
+				0.62,
+				0.72,
+				1.0
+			)
 		)
 
+		# El eje del CylinderMesh es Y.
+		# Lo tumbamos para que funcione como placa frontal.
 		visual.rotation_degrees = Vector3(
+			90.0,
 			0.0,
-			45.0,
-			45.0
+			30.0
 		)
+
+		visual.position.z = 0.035
 
 	elif kind == "boost":
 		var boost_mesh := CylinderMesh.new()
@@ -2290,11 +2635,550 @@ func _build_pickup_visual(
 
 	item.add_child(visual)
 
+	if kind == "shield":
+		_add_shield_details(item)
+
+	if kind == "boost":
+		_add_boost_details(item)
+
 	if kind == "malware":
 		_add_malware_spikes(
 			item,
 			material
 		)
+
+		_add_malware_details(item)
+
+
+func _add_shield_details(
+	item: Node3D
+) -> void:
+	# --------------------------------------------------------
+	# Aro exterior
+	# --------------------------------------------------------
+
+	var rim := MeshInstance3D.new()
+	rim.name = "ShieldRim"
+
+	var rim_mesh := CylinderMesh.new()
+
+	rim_mesh.top_radius = 0.43
+	rim_mesh.bottom_radius = 0.43
+	rim_mesh.height = 0.075
+	rim_mesh.radial_segments = 6
+
+	rim.mesh = rim_mesh
+
+	rim.rotation_degrees = Vector3(
+		90.0,
+		0.0,
+		30.0
+	)
+
+	rim.position.z = -0.015
+
+	rim.material_override = _make_material(
+		Color(
+			0.015,
+			0.10,
+			0.14,
+			1.0
+		),
+		Color(
+			0.0,
+			0.34,
+			0.42,
+			1.0
+		)
+	)
+
+	item.add_child(rim)
+
+	# --------------------------------------------------------
+	# Núcleo energético
+	# --------------------------------------------------------
+
+	var core := MeshInstance3D.new()
+	core.name = "ShieldCore"
+
+	var core_mesh := CylinderMesh.new()
+
+	core_mesh.top_radius = 0.17
+	core_mesh.bottom_radius = 0.17
+	core_mesh.height = 0.14
+	core_mesh.radial_segments = 6
+
+	core.mesh = core_mesh
+
+	core.rotation_degrees = Vector3(
+		90.0,
+		0.0,
+		30.0
+	)
+
+	core.position.z = 0.105
+
+	core.material_override = _make_material(
+		Color(
+			0.02,
+			0.68,
+			0.76,
+			1.0
+		),
+		CYAN
+	)
+
+	item.add_child(core)
+
+	# --------------------------------------------------------
+	# Dos nervaduras formando una V tecnológica.
+	# Añaden lectura visual sin usar textura pesada.
+	# --------------------------------------------------------
+
+	for side in [-1.0, 1.0]:
+		var brace := MeshInstance3D.new()
+		var brace_mesh := BoxMesh.new()
+
+		brace_mesh.size = Vector3(
+			0.055,
+			0.27,
+			0.035
+		)
+
+		brace.mesh = brace_mesh
+
+		brace.position = Vector3(
+			float(side) * 0.075,
+			-0.035,
+			0.185
+		)
+
+		brace.rotation_degrees.z = (
+			float(side) * 31.0
+		)
+
+		brace.material_override = _make_material(
+			Color(
+				0.08,
+				0.72,
+				0.78,
+				1.0
+			),
+			CYAN
+		)
+
+		item.add_child(brace)
+
+	# --------------------------------------------------------
+	# Seis nodos de anclaje alrededor del escudo.
+	for bolt_index in range(6):
+		var angle := (
+			TAU
+			* float(bolt_index)
+			/ 6.0
+		)
+
+		var bolt := MeshInstance3D.new()
+		var bolt_mesh := SphereMesh.new()
+
+		bolt_mesh.radius = 0.040
+		bolt_mesh.height = 0.080
+		bolt_mesh.radial_segments = 7
+		bolt_mesh.rings = 3
+
+		bolt.mesh = bolt_mesh
+
+		bolt.position = Vector3(
+			cos(angle) * 0.30,
+			sin(angle) * 0.30,
+			0.205
+		)
+
+		bolt.material_override = _make_material(
+			Color(
+				0.10,
+				0.86,
+				0.92,
+				1.0
+			),
+			CYAN
+		)
+
+		item.add_child(bolt)
+
+	# Sombra estilizada.
+	# No añadimos PointLight para proteger rendimiento WebXR.
+	# --------------------------------------------------------
+
+	var shadow := MeshInstance3D.new()
+	shadow.name = "ShieldShadow"
+
+	var shadow_mesh := CylinderMesh.new()
+
+	shadow_mesh.top_radius = 0.34
+	shadow_mesh.bottom_radius = 0.34
+	shadow_mesh.height = 0.012
+	shadow_mesh.radial_segments = 16
+
+	shadow.mesh = shadow_mesh
+
+	# El pickup nace a Y = 0.95.
+	# Dejamos la sombra casi pegada al suelo.
+	shadow.position = Vector3(
+		0.0,
+		-0.925,
+		0.0
+	)
+
+	shadow.scale = Vector3(
+		1.30,
+		1.0,
+		0.58
+	)
+
+	shadow.material_override = _make_material(
+		Color(
+			0.008,
+			0.025,
+			0.030,
+			1.0
+		),
+		Color.BLACK
+	)
+
+	item.add_child(shadow)
+
+
+func _add_special_shadow(
+	item: Node3D,
+	shadow_name: String,
+	radius: float,
+	scale_x: float,
+	scale_z: float
+) -> void:
+	var shadow := MeshInstance3D.new()
+
+	shadow.name = shadow_name
+
+	var mesh := CylinderMesh.new()
+
+	mesh.top_radius = radius
+	mesh.bottom_radius = radius
+	mesh.height = 0.012
+	mesh.radial_segments = 14
+
+	shadow.mesh = mesh
+
+	shadow.position = Vector3(
+		0.0,
+		-0.925,
+		0.0
+	)
+
+	shadow.scale = Vector3(
+		scale_x,
+		1.0,
+		scale_z
+	)
+
+	shadow.material_override = _make_material(
+		Color(
+			0.010,
+			0.018,
+			0.022,
+			1.0
+		),
+		Color.BLACK
+	)
+
+	item.add_child(shadow)
+
+
+func _add_boost_details(
+	item: Node3D
+) -> void:
+	# Núcleo energético.
+	var core := MeshInstance3D.new()
+	core.name = "BoostCore"
+
+	var core_mesh := SphereMesh.new()
+
+	core_mesh.radius = 0.17
+	core_mesh.height = 0.34
+	core_mesh.radial_segments = 10
+	core_mesh.rings = 5
+
+	core.mesh = core_mesh
+
+	core.material_override = _make_material(
+		Color(
+			1.0,
+			0.64,
+			0.08,
+			1.0
+		),
+		YELLOW
+	)
+
+	item.add_child(core)
+
+	# Collar energético.
+	var collar := MeshInstance3D.new()
+	collar.name = "BoostCollar"
+
+	var collar_mesh := CylinderMesh.new()
+
+	collar_mesh.top_radius = 0.31
+	collar_mesh.bottom_radius = 0.31
+	collar_mesh.height = 0.045
+	collar_mesh.radial_segments = 8
+
+	collar.mesh = collar_mesh
+
+	collar.rotation_degrees = Vector3(
+		90.0,
+		0.0,
+		22.5
+	)
+
+	collar.material_override = _make_material(
+		Color(
+			0.45,
+			0.24,
+			0.025,
+			1.0
+		),
+		Color(
+			0.95,
+			0.52,
+			0.04,
+			1.0
+		)
+	)
+
+	item.add_child(collar)
+
+	# Aletas laterales tipo propulsor.
+	for side in [-1.0, 1.0]:
+		var fin := MeshInstance3D.new()
+		var fin_mesh := BoxMesh.new()
+
+		fin_mesh.size = Vector3(
+			0.07,
+			0.28,
+			0.055
+		)
+
+		fin.mesh = fin_mesh
+
+		fin.position = Vector3(
+			float(side) * 0.20,
+			0.0,
+			0.03
+		)
+
+		fin.rotation_degrees.z = (
+			float(side) * 32.0
+		)
+
+		fin.material_override = _make_material(
+			Color(
+				0.78,
+				0.42,
+				0.035,
+				1.0
+			),
+			YELLOW
+		)
+
+		item.add_child(fin)
+
+	# Segundo aro desplazado.
+	var rear_ring := MeshInstance3D.new()
+	rear_ring.name = "BoostRearRing"
+
+	var rear_ring_mesh := CylinderMesh.new()
+
+	rear_ring_mesh.top_radius = 0.38
+	rear_ring_mesh.bottom_radius = 0.38
+	rear_ring_mesh.height = 0.035
+	rear_ring_mesh.radial_segments = 10
+
+	rear_ring.mesh = rear_ring_mesh
+
+	rear_ring.rotation_degrees = Vector3(
+		90.0,
+		0.0,
+		18.0
+	)
+
+	rear_ring.position.z = -0.15
+
+	rear_ring.material_override = _make_material(
+		Color(
+			0.36,
+			0.18,
+			0.018,
+			1.0
+		),
+		YELLOW
+	)
+
+	item.add_child(rear_ring)
+
+	# Cuatro celdas energéticas.
+	for pod_index in range(4):
+		var angle := (
+			TAU
+			* float(pod_index)
+			/ 4.0
+		)
+
+		var pod := MeshInstance3D.new()
+		var pod_mesh := SphereMesh.new()
+
+		pod_mesh.radius = 0.055
+		pod_mesh.height = 0.11
+		pod_mesh.radial_segments = 7
+		pod_mesh.rings = 3
+
+		pod.mesh = pod_mesh
+
+		pod.position = Vector3(
+			cos(angle) * 0.30,
+			sin(angle) * 0.30,
+			0.10
+		)
+
+		pod.material_override = _make_material(
+			Color(
+				1.0,
+				0.76,
+				0.12,
+				1.0
+			),
+			YELLOW
+		)
+
+		item.add_child(pod)
+
+	_add_special_shadow(
+		item,
+		"BoostShadow",
+		0.31,
+		1.20,
+		0.58
+	)
+
+
+func _add_malware_details(
+	item: Node3D
+) -> void:
+	# Núcleo infeccioso visible dentro de la carcasa.
+	var core := MeshInstance3D.new()
+	core.name = "MalwareCore"
+
+	var core_mesh := SphereMesh.new()
+
+	core_mesh.radius = 0.17
+	core_mesh.height = 0.34
+	core_mesh.radial_segments = 9
+	core_mesh.rings = 4
+
+	core.mesh = core_mesh
+
+	core.material_override = _make_material(
+		Color(
+			0.88,
+			0.025,
+			0.095,
+			1.0
+		),
+		RED
+	)
+
+	item.add_child(core)
+
+	# Cinturón de contención roto.
+	var belt := MeshInstance3D.new()
+	belt.name = "MalwareBelt"
+
+	var belt_mesh := CylinderMesh.new()
+
+	belt_mesh.top_radius = 0.39
+	belt_mesh.bottom_radius = 0.39
+	belt_mesh.height = 0.050
+	belt_mesh.radial_segments = 8
+
+	belt.mesh = belt_mesh
+
+	belt.rotation_degrees = Vector3(
+		90.0,
+		0.0,
+		22.5
+	)
+
+	belt.material_override = _make_material(
+		Color(
+			0.22,
+			0.010,
+			0.035,
+			1.0
+		),
+		Color(
+			0.62,
+			0.015,
+			0.070,
+			1.0
+		)
+	)
+
+	item.add_child(belt)
+
+	# Nodos de infección secundarios.
+	for infection_index in range(4):
+		var angle := (
+			TAU
+			* float(infection_index)
+			/ 4.0
+			+ PI * 0.25
+		)
+
+		var node := MeshInstance3D.new()
+		var node_mesh := SphereMesh.new()
+
+		node_mesh.radius = 0.070
+		node_mesh.height = 0.14
+		node_mesh.radial_segments = 7
+		node_mesh.rings = 3
+
+		node.mesh = node_mesh
+
+		node.position = Vector3(
+			cos(angle) * 0.28,
+			sin(angle) * 0.28,
+			0.12
+		)
+
+		node.material_override = _make_material(
+			Color(
+				0.96,
+				0.018,
+				0.10,
+				1.0
+			),
+			RED
+		)
+
+		item.add_child(node)
+
+	_add_special_shadow(
+		item,
+		"MalwareShadow",
+		0.35,
+		1.25,
+		0.62
+	)
 
 
 func _add_malware_spikes(
@@ -2519,6 +3403,36 @@ func _update_level_visuals(
 		1.0
 	)
 
+	# Nivel 1:
+	# amanecer tecnológico sobre Cyber-Savanna.
+	var target_sky_top := Color(
+		0.055,
+		0.19,
+		0.34,
+		1.0
+	)
+
+	var target_sky_horizon := Color(
+		0.60,
+		0.52,
+		0.34,
+		1.0
+	)
+
+	var target_ground_horizon := Color(
+		0.16,
+		0.25,
+		0.18,
+		1.0
+	)
+
+	var target_ground_bottom := Color(
+		0.025,
+		0.055,
+		0.040,
+		1.0
+	)
+
 	var target_ambient := Color(
 		0.38,
 		0.48,
@@ -2561,6 +3475,35 @@ func _update_level_visuals(
 				0.085,
 				0.025,
 				0.045,
+				1.0
+			)
+
+			# Ocaso infeccioso.
+			target_sky_top = Color(
+				0.22,
+				0.055,
+				0.075,
+				1.0
+			)
+
+			target_sky_horizon = Color(
+				1.0,
+				0.48,
+				0.16,
+				1.0
+			)
+
+			target_ground_horizon = Color(
+				0.24,
+				0.07,
+				0.04,
+				1.0
+			)
+
+			target_ground_bottom = Color(
+				0.035,
+				0.012,
+				0.016,
 				1.0
 			)
 
@@ -2612,6 +3555,35 @@ func _update_level_visuals(
 				1.0
 			)
 
+			# Noche crítica de red.
+			target_sky_top = Color(
+				0.018,
+				0.045,
+				0.14,
+				1.0
+			)
+
+			target_sky_horizon = Color(
+				0.14,
+				0.24,
+				0.52,
+				1.0
+			)
+
+			target_ground_horizon = Color(
+				0.018,
+				0.045,
+				0.080,
+				1.0
+			)
+
+			target_ground_bottom = Color(
+				0.004,
+				0.008,
+				0.018,
+				1.0
+			)
+
 			target_ambient = Color(
 				0.19,
 				0.24,
@@ -2655,6 +3627,36 @@ func _update_level_visuals(
 		0.0,
 		1.0
 	)
+
+	if sky_material != null:
+		sky_material.sky_top_color = (
+			sky_material.sky_top_color.lerp(
+				target_sky_top,
+				blend
+			)
+		)
+
+		sky_material.sky_horizon_color = (
+			sky_material.sky_horizon_color.lerp(
+				target_sky_horizon,
+				blend
+			)
+		)
+
+		sky_material.ground_horizon_color = (
+			sky_material.ground_horizon_color.lerp(
+				target_ground_horizon,
+				blend
+			)
+		)
+
+		sky_material.ground_bottom_color = (
+			sky_material.ground_bottom_color.lerp(
+				target_ground_bottom,
+				blend
+			)
+		)
+
 
 	world_environment.background_color = (
 		world_environment.background_color.lerp(
@@ -2732,11 +3734,31 @@ func _update_level_progression() -> void:
 
 	current_level = target_level
 
-	if player.has_method("celebrate"):
+	# Salto real del nodo jugador.
+	if not is_jumping:
+		_begin_jump()
+
+	# Oscar hace su festejo cinematográfico:
+	# gira a cámara, levanta brazos y vuelve a carrera.
+	if player.has_method("celebrate_level"):
+		player.call(
+			"celebrate_level",
+			1.85
+		)
+
+	elif player.has_method("celebrate"):
 		player.call(
 			"celebrate",
-			1.7
+			1.85
 		)
+
+	_show_event_feedback(
+		"★ NIVEL %02d // OSCAR ONLINE"
+		% current_level,
+		YELLOW if current_level == 2 else RED,
+		1.65
+	)
+
 
 	_apply_level_change()
 
@@ -2872,18 +3894,40 @@ func _style_title(
 		FONT_UI_ITALIC
 	)
 
+	# Contorno negro fuerte:
+	# mantiene legibilidad sobre cielo, nubes y luces.
 	label.add_theme_color_override(
 		"font_outline_color",
 		Color(
-			CYAN.r,
-			CYAN.g,
-			CYAN.b,
-			0.55
+			0.0,
+			0.0,
+			0.0,
+			0.96
 		)
 	)
 
 	label.add_theme_constant_override(
 		"outline_size",
+		5
+	)
+
+	label.add_theme_color_override(
+		"font_shadow_color",
+		Color(
+			0.0,
+			0.0,
+			0.0,
+			0.82
+		)
+	)
+
+	label.add_theme_constant_override(
+		"shadow_offset_x",
+		2
+	)
+
+	label.add_theme_constant_override(
+		"shadow_offset_y",
 		2
 	)
 
@@ -2898,6 +3942,41 @@ func _style_italic(
 		FONT_UI_ITALIC
 	)
 
+	label.add_theme_color_override(
+		"font_outline_color",
+		Color(
+			0.0,
+			0.0,
+			0.0,
+			0.94
+		)
+	)
+
+	label.add_theme_constant_override(
+		"outline_size",
+		3
+	)
+
+	label.add_theme_color_override(
+		"font_shadow_color",
+		Color(
+			0.0,
+			0.0,
+			0.0,
+			0.78
+		)
+	)
+
+	label.add_theme_constant_override(
+		"shadow_offset_x",
+		2
+	)
+
+	label.add_theme_constant_override(
+		"shadow_offset_y",
+		2
+	)
+
 
 func _style_telemetry(
 	label: Label
@@ -2907,6 +3986,41 @@ func _style_telemetry(
 		FONT_TELEMETRY
 	)
 
+	label.add_theme_color_override(
+		"font_outline_color",
+		Color(
+			0.0,
+			0.0,
+			0.0,
+			0.94
+		)
+	)
+
+	label.add_theme_constant_override(
+		"outline_size",
+		3
+	)
+
+	label.add_theme_color_override(
+		"font_shadow_color",
+		Color(
+			0.0,
+			0.0,
+			0.0,
+			0.76
+		)
+	)
+
+	label.add_theme_constant_override(
+		"shadow_offset_x",
+		2
+	)
+
+	label.add_theme_constant_override(
+		"shadow_offset_y",
+		2
+	)
+
 
 func _style_button(
 	button: Button
@@ -2914,6 +4028,99 @@ func _style_button(
 	button.add_theme_font_override(
 		"font",
 		FONT_UI
+	)
+
+	button.add_theme_color_override(
+		"font_outline_color",
+		Color(
+			0.0,
+			0.0,
+			0.0,
+			0.96
+		)
+	)
+
+	button.add_theme_constant_override(
+		"outline_size",
+		2
+	)
+
+	var normal := StyleBoxFlat.new()
+
+	normal.bg_color = Color(
+		0.006,
+		0.025,
+		0.038,
+		0.91
+	)
+
+	normal.border_color = Color(
+		0.0,
+		0.55,
+		0.64,
+		0.72
+	)
+
+	normal.set_border_width_all(1)
+
+	normal.corner_radius_top_left = 8
+	normal.corner_radius_top_right = 8
+	normal.corner_radius_bottom_left = 8
+	normal.corner_radius_bottom_right = 8
+
+	button.add_theme_stylebox_override(
+		"normal",
+		normal
+	)
+
+	var hover: StyleBoxFlat = (
+		normal.duplicate()
+		as StyleBoxFlat
+	)
+
+	hover.bg_color = Color(
+		0.015,
+		0.11,
+		0.14,
+		0.96
+	)
+
+	hover.border_color = CYAN
+
+	button.add_theme_stylebox_override(
+		"hover",
+		hover
+	)
+
+	var pressed: StyleBoxFlat = (
+		normal.duplicate()
+		as StyleBoxFlat
+	)
+
+	pressed.bg_color = Color(
+		0.0,
+		0.18,
+		0.22,
+		0.98
+	)
+
+	pressed.border_color = CYAN
+
+	button.add_theme_stylebox_override(
+		"pressed",
+		pressed
+	)
+
+	var focus: StyleBoxFlat = (
+		hover.duplicate()
+		as StyleBoxFlat
+	)
+
+	focus.set_border_width_all(2)
+
+	button.add_theme_stylebox_override(
+		"focus",
+		focus
 	)
 
 
@@ -3281,7 +4488,7 @@ func _build_web_entry_gate() -> void:
 	var enter_button := Button.new()
 
 	enter_button.text = (
-		"TOCA / CLICK / ENTER PARA ENTRAR"
+		"TOCA / CLIC / ENTER PARA ENTRAR"
 	)
 
 	enter_button.custom_minimum_size = Vector2(
@@ -3305,6 +4512,37 @@ func _build_web_entry_gate() -> void:
 	)
 
 	box.add_child(enter_button)
+
+	webxr_button = Button.new()
+
+	webxr_button.text = (
+		"QUEST / ENTRAR EN VR"
+	)
+
+	webxr_button.custom_minimum_size = Vector2(
+		420.0,
+		56.0
+	)
+
+	webxr_button.focus_mode = (
+		Control.FOCUS_ALL
+	)
+
+	_style_button(webxr_button)
+
+	webxr_button.add_theme_font_size_override(
+		"font_size",
+		17
+	)
+
+	webxr_button.disabled = true
+	webxr_button.visible = OS.has_feature("web")
+
+	webxr_button.pressed.connect(
+		_request_webxr_session
+	)
+
+	box.add_child(webxr_button)
 
 	var audio_hint := Label.new()
 
@@ -3368,6 +4606,351 @@ func _enter_web_game() -> void:
 		web_entry_overlay.hide()
 
 	_start_cinematic_intro()
+
+
+# ============================================================
+# META QUEST / WEBXR
+# ============================================================
+
+func _setup_webxr() -> void:
+	if not OS.has_feature("web"):
+		return
+
+	webxr_interface = (
+		XRServer.find_interface("WebXR")
+		as WebXRInterface
+	)
+
+	if webxr_interface == null:
+		print("WEBXR // interfaz no disponible")
+		return
+
+	webxr_interface.session_supported.connect(
+		_on_webxr_session_supported
+	)
+
+	webxr_interface.session_started.connect(
+		_on_webxr_session_started
+	)
+
+	webxr_interface.session_ended.connect(
+		_on_webxr_session_ended
+	)
+
+	webxr_interface.session_failed.connect(
+		_on_webxr_session_failed
+	)
+
+	_build_xr_rig()
+
+	print("WEBXR // consultando immersive-vr")
+
+	webxr_interface.is_session_supported(
+		"immersive-vr"
+	)
+
+
+func _build_xr_rig() -> void:
+	xr_origin = XROrigin3D.new()
+	xr_origin.name = "QuestXROrigin"
+
+	# Cámara aproximadamente en la posición
+	# de nuestra cámara third-person normal.
+	xr_origin.position = Vector3(
+		0.0,
+		3.20,
+		7.0
+	)
+
+	xr_origin.current = false
+
+	add_child(xr_origin)
+
+	xr_camera = XRCamera3D.new()
+	xr_camera.name = "QuestXRCamera"
+	xr_camera.near = 0.05
+	xr_camera.far = 100.0
+
+	xr_origin.add_child(xr_camera)
+
+	xr_left_controller = XRController3D.new()
+	xr_left_controller.name = "QuestLeftController"
+	xr_left_controller.tracker = &"left_hand"
+	xr_left_controller.pose = &"aim"
+
+	xr_origin.add_child(
+		xr_left_controller
+	)
+
+	xr_right_controller = XRController3D.new()
+	xr_right_controller.name = "QuestRightController"
+	xr_right_controller.tracker = &"right_hand"
+	xr_right_controller.pose = &"aim"
+
+	xr_origin.add_child(
+		xr_right_controller
+	)
+
+	xr_left_controller.button_pressed.connect(
+		_on_xr_button_pressed.bind("LEFT")
+	)
+
+	xr_right_controller.button_pressed.connect(
+		_on_xr_button_pressed.bind("RIGHT")
+	)
+
+	xr_left_controller.profile_changed.connect(
+		_on_xr_profile_changed.bind("LEFT")
+	)
+
+	xr_right_controller.profile_changed.connect(
+		_on_xr_profile_changed.bind("RIGHT")
+	)
+
+
+func _on_webxr_session_supported(
+	session_mode: String,
+	supported: bool
+) -> void:
+	if session_mode != "immersive-vr":
+		return
+
+	webxr_supported = supported
+
+	print(
+		"WEBXR // immersive-vr supported: ",
+		supported
+	)
+
+	if not is_instance_valid(webxr_button):
+		return
+
+	webxr_button.disabled = not supported
+
+	if supported:
+		webxr_button.text = (
+			"QUEST / ENTRAR EN VR"
+		)
+	else:
+		webxr_button.text = (
+			"WEBXR NO DISPONIBLE"
+		)
+
+
+func _request_webxr_session() -> void:
+	if (
+		webxr_interface == null
+		or not webxr_supported
+		or webxr_request_pending
+	):
+		return
+
+	webxr_request_pending = true
+
+	if is_instance_valid(webxr_button):
+		webxr_button.disabled = true
+		webxr_button.text = (
+			"ENTRANDO EN QUEST VR..."
+		)
+
+	# Packet Runner es una experiencia
+	# third-person / runner.
+	# LOCAL evita imponer room-scale.
+	webxr_interface.session_mode = (
+		"immersive-vr"
+	)
+
+	webxr_interface.requested_reference_space_types = (
+		"local"
+	)
+
+	webxr_interface.required_features = ""
+	webxr_interface.optional_features = ""
+
+	print("WEBXR // solicitando sesión Quest")
+
+	if not webxr_interface.initialize():
+		webxr_request_pending = false
+
+		if is_instance_valid(webxr_button):
+			webxr_button.disabled = false
+			webxr_button.text = (
+				"QUEST / ENTRAR EN VR"
+			)
+
+		print("WEBXR // initialize() rechazado")
+
+
+func _on_webxr_session_started() -> void:
+	webxr_request_pending = false
+	xr_mode_active = true
+	xr_lane_latched = false
+
+	get_viewport().use_xr = true
+
+	if is_instance_valid(camera):
+		camera.current = false
+
+	if is_instance_valid(xr_origin):
+		xr_origin.current = true
+
+	if is_instance_valid(xr_camera):
+		xr_camera.current = true
+
+	_set_touch_controls_visible(false)
+
+	print("===== WEBXR QUEST =====")
+	print(
+		"Reference space: ",
+		webxr_interface.reference_space_type
+	)
+	print(
+		"Features: ",
+		webxr_interface.enabled_features
+	)
+
+	# Entramos al mismo flujo de juego,
+	# incluida la intro y el audio.
+	if web_entry_pending:
+		_enter_web_game()
+
+
+func _on_webxr_session_ended() -> void:
+	print("WEBXR // sesión terminada")
+
+	get_viewport().use_xr = false
+
+	xr_mode_active = false
+	xr_lane_latched = false
+
+	if is_instance_valid(xr_origin):
+		xr_origin.current = false
+
+	if is_instance_valid(camera):
+		camera.current = true
+
+	if (
+		game_state == GameState.PLAYING
+	):
+		_set_touch_controls_visible(true)
+
+	if is_instance_valid(webxr_button):
+		webxr_button.disabled = not webxr_supported
+		webxr_button.text = (
+			"QUEST / ENTRAR EN VR"
+		)
+
+
+func _on_webxr_session_failed(
+	message: String
+) -> void:
+	webxr_request_pending = false
+	xr_mode_active = false
+
+	print(
+		"WEBXR // ERROR: ",
+		message
+	)
+
+	if is_instance_valid(webxr_button):
+		webxr_button.disabled = not webxr_supported
+		webxr_button.text = (
+			"QUEST / ENTRAR EN VR"
+		)
+
+
+func _on_xr_profile_changed(
+	role: String,
+	hand: String
+) -> void:
+	print(
+		"XR PROFILE // ",
+		hand,
+		" // ",
+		role
+	)
+
+
+func _on_xr_button_pressed(
+	action_name: String,
+	hand: String
+) -> void:
+	print(
+		"XR BUTTON // ",
+		hand,
+		" // ",
+		action_name
+	)
+
+	if game_state == GameState.INTRO:
+		if action_name in [
+			"trigger_click",
+			"ax_button"
+		]:
+			_finish_cinematic_intro()
+
+		return
+
+	if (
+		game_state == GameState.PAUSED
+		and action_name == "by_button"
+	):
+		_toggle_pause()
+		return
+
+	if game_state != GameState.PLAYING:
+		return
+
+	if action_name in [
+		"trigger_click",
+		"ax_button",
+		"thumbstick_click"
+	]:
+		_begin_jump()
+
+	elif action_name == "by_button":
+		_toggle_pause()
+
+
+func _handle_xr_axes() -> void:
+	if not xr_mode_active:
+		return
+
+	var stick := Vector2.ZERO
+
+	for controller in [
+		xr_left_controller,
+		xr_right_controller
+	]:
+		if not is_instance_valid(controller):
+			continue
+
+		var candidate: Vector2 = controller.get_vector2(
+			&"thumbstick"
+		)
+
+		if (
+			candidate.length_squared()
+			> stick.length_squared()
+		):
+			stick = candidate
+
+	# Carriles por joystick.
+	if absf(stick.x) <= XR_STICK_DEADZONE:
+		xr_lane_latched = false
+
+	elif not xr_lane_latched:
+		if stick.x <= -XR_LANE_THRESHOLD:
+			_touch_left()
+			xr_lane_latched = true
+
+		elif stick.x >= XR_LANE_THRESHOLD:
+			_touch_right()
+			xr_lane_latched = true
+
+	# Profundidad, igual que W/S o stick normal.
+	if absf(stick.y) > XR_STICK_DEADZONE:
+		forward_input += stick.y
 
 
 # ============================================================
