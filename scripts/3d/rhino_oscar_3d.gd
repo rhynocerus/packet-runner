@@ -34,6 +34,9 @@ var steering_current := 0.0
 var hero_pose_active := false
 var celebrate_remaining := 0.0
 
+var level_celebrate_remaining := 0.0
+var level_celebrate_duration := 1.85
+
 var base_pos := {}
 var base_rot := {}
 
@@ -83,6 +86,11 @@ func _process(delta: float) -> void:
 		celebrate_remaining - delta
 	)
 
+	level_celebrate_remaining = maxf(
+		0.0,
+		level_celebrate_remaining - delta
+	)
+
 	if running:
 		_process_running(delta)
 	else:
@@ -95,6 +103,9 @@ func _process(delta: float) -> void:
 
 	if airborne:
 		_process_airborne(delta)
+
+	if level_celebrate_remaining > 0.0:
+		_process_level_celebrate()
 
 
 func _find_node(
@@ -269,6 +280,24 @@ func set_hero_pose(
 func celebrate(
 	duration: float = 1.2
 ) -> void:
+	celebrate_remaining = maxf(
+		celebrate_remaining,
+		duration
+	)
+
+
+func celebrate_level(
+	duration: float = 1.85
+) -> void:
+	level_celebrate_duration = maxf(
+		duration,
+		0.20
+	)
+
+	level_celebrate_remaining = (
+		level_celebrate_duration
+	)
+
 	celebrate_remaining = maxf(
 		celebrate_remaining,
 		duration
@@ -517,6 +546,133 @@ func _process_celebrate() -> void:
 		)
 
 		arm_r.rotation = r
+
+
+func _process_level_celebrate() -> void:
+	var duration := maxf(
+		level_celebrate_duration,
+		0.001
+	)
+
+	var phase := clampf(
+		1.0
+		- level_celebrate_remaining
+		/ duration,
+		0.0,
+		1.0
+	)
+
+	# 0 -> cámara -> 0.
+	# En la mitad del gesto llega casi a 180 grados.
+	var turn_wave := sin(
+		phase * PI
+	)
+
+	var hop_wave := sin(
+		phase * PI
+	)
+
+	var cheer := sin(
+		elapsed * 16.0
+	)
+
+	if is_instance_valid(body_root):
+		var p := _base_position(
+			body_root
+		)
+
+		var r := _base_rotation(
+			body_root
+		)
+
+		body_root.position = (
+			p
+			+ Vector3(
+				0.0,
+				hop_wave * 0.16,
+				0.0
+			)
+		)
+
+		body_root.rotation = (
+			r
+			+ Vector3(
+				deg_to_rad(
+					-7.0 * hop_wave
+				),
+				deg_to_rad(
+					165.0 * turn_wave
+				),
+				0.0
+			)
+		)
+
+	if is_instance_valid(head_pivot):
+		var r := _base_rotation(
+			head_pivot
+		)
+
+		r.x += deg_to_rad(
+			-10.0
+			* turn_wave
+		)
+
+		r.z += deg_to_rad(
+			cheer * 3.5
+		)
+
+		head_pivot.rotation = r
+
+	if is_instance_valid(arm_l):
+		var r := _base_rotation(
+			arm_l
+		)
+
+		r.x += deg_to_rad(
+			-38.0
+			+ cheer * 12.0
+		)
+
+		r.z += deg_to_rad(
+			-84.0 * turn_wave
+		)
+
+		arm_l.rotation = r
+
+	if is_instance_valid(arm_r):
+		var r := _base_rotation(
+			arm_r
+		)
+
+		r.x += deg_to_rad(
+			-38.0
+			- cheer * 12.0
+		)
+
+		r.z += deg_to_rad(
+			84.0 * turn_wave
+		)
+
+		arm_r.rotation = r
+
+	# Un pequeño encogimiento de piernas
+	# para reforzar visualmente el brinco real.
+	for leg in [
+		leg_l,
+		leg_r
+	]:
+		if not is_instance_valid(leg):
+			continue
+
+		var r := _base_rotation(
+			leg
+		)
+
+		r.x += deg_to_rad(
+			18.0 * hop_wave
+		)
+
+		leg.rotation = r
 
 
 func _process_hero_pose(
