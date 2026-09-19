@@ -6,17 +6,17 @@ Packet Runner is built with **Godot 4** and **GDScript** as a practical developm
 
 <p align="center">
   <a href="https://rhynocerus.github.io/packet-runner/"><img alt="Play Packet Runner 2D" src="https://img.shields.io/badge/PLAY-2D%20LEGACY-00BCD4?style=for-the-badge&logo=godotengine&logoColor=white"></a>
-  <a href="https://rhynocerus.github.io/packet-runner/3d-v081/"><img alt="Play Packet Runner 3D" src="https://img.shields.io/badge/PLAY-3D%20WEB%20BUILD-00C896?style=for-the-badge&logo=godotengine&logoColor=white"></a>
+  <a href="https://rhynocerus.github.io/packet-runner/3d/"><img alt="Play Packet Runner 3D" src="https://img.shields.io/badge/PLAY-3D%20WEB%20BUILD-00C896?style=for-the-badge&logo=godotengine&logoColor=white"></a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/rhynocerus/packet-runner/tree/packet-runner-3d-v0.8.1"><img alt="3D v0.8.1" src="https://img.shields.io/badge/3D%20MILESTONE-v0.8.1-6C63FF?style=flat-square"></a>
+  <a href="https://github.com/rhynocerus/packet-runner/tree/packet-runner-3d-v0.8.3"><img alt="3D v0.8.3" src="https://img.shields.io/badge/3D%20MILESTONE-v0.8.3-6C63FF?style=flat-square"></a>
   <img alt="Godot 4" src="https://img.shields.io/badge/Godot-4.x-478CBF?style=flat-square&logo=godotengine&logoColor=white">
   <img alt="GDScript" src="https://img.shields.io/badge/GDScript-active-5D87BF?style=flat-square">
 </p>
 
-> **Current development milestone:** `packet-runner-3d-v0.8.1`  
-> **Next planned pass:** `v0.8.2` Universal Controls for touch, gamepad and VR-controller-friendly input.
+> **Current development milestone:** `packet-runner-3d-v0.8.3`  
+> **Next planned pass:** `v0.8.4` performance, accessibility and multiplatform polish.
 
 ## Two generations, one project
 
@@ -25,7 +25,7 @@ Packet Runner is **not split into separate repositories**. The 2D version is kep
 | Generation | Status | What it represents | Play |
 |---|---|---|---|
 | **Packet Runner 2D** | Legacy / playable | Original network-arcade prototype and the foundation of the project | [Play 2D](https://rhynocerus.github.io/packet-runner/) |
-| **Packet Runner 3D** | Active development | Cyber-Savanna runner, cinematic presentation, Rhino Oscar and expanded mechanics | [Play 3D](https://rhynocerus.github.io/packet-runner/3d-v081/) |
+| **Packet Runner 3D** | Active development | Cyber-Savanna runner, cinematic presentation, Rhino Oscar and expanded mechanics | [Play 3D](https://rhynocerus.github.io/packet-runner/3d/) |
 
 The web build can temporarily trail the newest development commit until the latest export is published to GitHub Pages. Tagged milestones remain reproducible from Git.
 
@@ -65,7 +65,7 @@ The 3D world develops this idea as the **Cyber-Savanna**, where technology and n
 
 ## Packet Runner 3D · Current generation
 
-The current 3D milestone is **v0.8.1**.
+The current 3D milestone is **v0.8.3**.
 
 ### Highlights
 
@@ -81,6 +81,9 @@ The current 3D milestone is **v0.8.1**.
 - 📦 Safe-packet scoring
 - 🎵 Level music and gameplay sound effects
 - 🌅 Multi-level visual progression
+- 🌫️ Visual depth, atmosphere and savanna lighting pass
+- 🎉 Oscar celebration and stronger victory feedback
+- 🎮 WebXR/Quest-oriented input exploration
 - 🌐 Native and web-oriented development workflow
 
 ### Desktop controls
@@ -92,7 +95,7 @@ The current 3D milestone is **v0.8.1**.
 | Jump | `Space` |
 | Pause / back | `Esc` |
 
-Touch and gamepad/VR-controller input are planned for the **v0.8.2 Universal Controls** pass.
+Touch, gamepad and VR-controller-friendly input are included in the v0.8.3 direction; further accessibility polish continues in v0.8.4.
 
 ## Packet Runner 2D · Legacy generation
 
@@ -117,7 +120,7 @@ The 2D version is intentionally retained so the transition from a compact protot
 | `0.2-dev` | 2D | Early playable network-arcade prototype |
 | `packet-runner-3d-v0.6.2` | 3D | Playable 3D vertical-slice baseline |
 | `v0.7.1` | 3D | Cinematic Director Pass |
-| **`packet-runner-3d-v0.8.1`** | **3D** | **Rhino Oscar, wider lanes, 3/4 steering and jump mechanics** |
+| **`packet-runner-3d-v0.8.3`** | **3D** | **Visual depth, atmosphere, UI readability and Oscar celebration pass** |
 
 See **[CHANGELOG.md](CHANGELOG.md)** for the milestone notes.
 
@@ -157,7 +160,7 @@ godot --path .
 ### Reproduce the current 3D milestone
 
 ```bash
-git checkout packet-runner-3d-v0.8.1
+git checkout packet-runner-3d-v0.8.3
 godot --path . scenes/3d/game/packet_runner_3d.tscn
 ```
 
